@@ -4,7 +4,6 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCrusherStore } from '../../lib/store/useCrusherStore';
-import { crusherStore, InternalRole } from '../../lib/store/crusher-store';
 import {
   Layers,
   Smartphone,
@@ -20,11 +19,15 @@ export const Header: React.FC<HeaderProps> = ({ onOpenWhatsAppSimulator }) => {
   const pathname = usePathname();
 
   const failedCount = store.whatsappMessages.filter((m) => m.status === 'FAILED').length;
-  const queuedCount = store.trips.filter((t) => t.status === 'QUEUED').length;
 
-  const handleRoleClick = (role: InternalRole) => {
-    crusherStore.setRole(role);
+  const getPageInfo = () => {
+    if (pathname === '/owner') return { title: 'Owner & Admin', badge: 'Full Access' };
+    if (pathname === '/office') return { title: 'Office Operator', badge: 'Order Booking' };
+    if (pathname === '/site') return { title: 'Site Operator', badge: 'Weighbridge & Plant' };
+    return { title: 'ERP Portal', badge: 'Internal' };
   };
+
+  const pageInfo = getPageInfo();
 
   return (
     <header
@@ -39,64 +42,53 @@ export const Header: React.FC<HeaderProps> = ({ onOpenWhatsAppSimulator }) => {
         gap: '12px',
       }}
     >
-      {/* Brand */}
-      <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+      {/* Brand & Current Page Title */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+          <div
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '6px',
+              backgroundColor: '#2563EB',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#FFF',
+            }}
+          >
+            <Layers size={18} />
+          </div>
+          <div>
+            <div style={{ fontSize: '1rem', fontWeight: 700, color: '#F9FAFB', lineHeight: 1.2 }}>
+              StoneCrusher <span style={{ color: '#60A5FA', fontWeight: 500 }}>ERP</span>
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#9CA3AF' }}>Quarry Operations System</div>
+          </div>
+        </Link>
+
+        {/* Current Active Section Badge (Read-only, no switcher) */}
         <div
           style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '6px',
-            backgroundColor: '#2563EB',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            color: '#FFF',
+            gap: '8px',
+            paddingLeft: '14px',
+            borderLeft: '1px solid #1F2937',
           }}
         >
-          <Layers size={18} />
+          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#F3F4F6' }}>
+            {pageInfo.title}
+          </span>
+          <span className="badge badge-slate" style={{ fontSize: '0.68rem' }}>
+            {pageInfo.badge}
+          </span>
         </div>
-        <div>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#F9FAFB', lineHeight: 1.2 }}>
-            StoneCrusher <span style={{ color: '#60A5FA', fontWeight: 500 }}>ERP</span>
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#9CA3AF' }}>Internal Operations System</div>
-        </div>
-      </Link>
-
-      {/* Role Navigation (Direct Links to Separate Pages) */}
-      <div
-        style={{
-          display: 'flex',
-          backgroundColor: '#0B0F17',
-          padding: '3px',
-          borderRadius: '6px',
-          border: '1px solid #1F2937',
-          gap: '2px',
-        }}
-      >
-        <RoleLink
-          href="/owner"
-          active={pathname === '/owner' || (pathname === '/' && store.currentRole === 'OWNER_ADMIN')}
-          label="Owner / Admin"
-          onClick={() => handleRoleClick('OWNER_ADMIN')}
-        />
-        <RoleLink
-          href="/office"
-          active={pathname === '/office' || (pathname === '/' && store.currentRole === 'OFFICE_OPERATOR')}
-          label="Office Operator"
-          badge={queuedCount > 0 ? `${queuedCount}` : undefined}
-          onClick={() => handleRoleClick('OFFICE_OPERATOR')}
-        />
-        <RoleLink
-          href="/site"
-          active={pathname === '/site' || (pathname === '/' && store.currentRole === 'SITE_OPERATOR')}
-          label="Site Operator"
-          onClick={() => handleRoleClick('SITE_OPERATOR')}
-        />
       </div>
 
-      {/* User & WhatsApp Preview */}
+      {/* User Information & WhatsApp Simulator (No role/user switcher) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* Read-only Staff User Info */}
         <div
           style={{
             display: 'flex',
@@ -113,6 +105,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenWhatsAppSimulator }) => {
           <span>{store.currentStaffName}</span>
         </div>
 
+        {/* WhatsApp Simulator Trigger */}
         <button
           onClick={onOpenWhatsAppSimulator}
           className="btn-secondary"
@@ -140,45 +133,3 @@ export const Header: React.FC<HeaderProps> = ({ onOpenWhatsAppSimulator }) => {
     </header>
   );
 };
-
-const RoleLink: React.FC<{
-  href: string;
-  active: boolean;
-  label: string;
-  badge?: string;
-  onClick: () => void;
-}> = ({ href, active, label, badge, onClick }) => (
-  <Link
-    href={href}
-    onClick={onClick}
-    style={{
-      padding: '5px 12px',
-      fontSize: '0.78rem',
-      fontWeight: active ? 600 : 400,
-      borderRadius: '4px',
-      backgroundColor: active ? '#2563EB' : 'transparent',
-      color: active ? '#FFFFFF' : '#9CA3AF',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-      textDecoration: 'none',
-      transition: 'all 0.15s ease',
-    }}
-  >
-    <span>{label}</span>
-    {badge && (
-      <span
-        style={{
-          fontSize: '0.68rem',
-          backgroundColor: active ? 'rgba(255,255,255,0.25)' : '#1F2937',
-          color: active ? '#FFFFFF' : '#D1D5DB',
-          padding: '0 5px',
-          borderRadius: '3px',
-          fontWeight: 600,
-        }}
-      >
-        {badge}
-      </span>
-    )}
-  </Link>
-);
