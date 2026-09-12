@@ -1,13 +1,13 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useCrusherStore } from '../../lib/store/useCrusherStore';
 import { crusherStore, InternalRole } from '../../lib/store/crusher-store';
 import {
   Layers,
   Smartphone,
-  CheckCircle,
-  AlertCircle,
   User,
 } from 'lucide-react';
 
@@ -17,9 +17,14 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onOpenWhatsAppSimulator }) => {
   const store = useCrusherStore();
+  const pathname = usePathname();
 
   const failedCount = store.whatsappMessages.filter((m) => m.status === 'FAILED').length;
   const queuedCount = store.trips.filter((t) => t.status === 'QUEUED').length;
+
+  const handleRoleClick = (role: InternalRole) => {
+    crusherStore.setRole(role);
+  };
 
   return (
     <header
@@ -35,7 +40,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenWhatsAppSimulator }) => {
       }}
     >
       {/* Brand */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
         <div
           style={{
             width: '32px',
@@ -56,9 +61,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenWhatsAppSimulator }) => {
           </div>
           <div style={{ fontSize: '0.72rem', color: '#9CA3AF' }}>Internal Operations System</div>
         </div>
-      </div>
+      </Link>
 
-      {/* Role Navigation (Segmented Switcher) */}
+      {/* Role Navigation (Direct Links to Separate Pages) */}
       <div
         style={{
           display: 'flex',
@@ -69,21 +74,24 @@ export const Header: React.FC<HeaderProps> = ({ onOpenWhatsAppSimulator }) => {
           gap: '2px',
         }}
       >
-        <RoleTab
-          active={store.currentRole === 'OWNER_ADMIN'}
+        <RoleLink
+          href="/owner"
+          active={pathname === '/owner' || (pathname === '/' && store.currentRole === 'OWNER_ADMIN')}
           label="Owner / Admin"
-          onClick={() => crusherStore.setRole('OWNER_ADMIN')}
+          onClick={() => handleRoleClick('OWNER_ADMIN')}
         />
-        <RoleTab
-          active={store.currentRole === 'OFFICE_OPERATOR'}
+        <RoleLink
+          href="/office"
+          active={pathname === '/office' || (pathname === '/' && store.currentRole === 'OFFICE_OPERATOR')}
           label="Office Operator"
           badge={queuedCount > 0 ? `${queuedCount}` : undefined}
-          onClick={() => crusherStore.setRole('OFFICE_OPERATOR')}
+          onClick={() => handleRoleClick('OFFICE_OPERATOR')}
         />
-        <RoleTab
-          active={store.currentRole === 'SITE_OPERATOR'}
+        <RoleLink
+          href="/site"
+          active={pathname === '/site' || (pathname === '/' && store.currentRole === 'SITE_OPERATOR')}
           label="Site Operator"
-          onClick={() => crusherStore.setRole('SITE_OPERATOR')}
+          onClick={() => handleRoleClick('SITE_OPERATOR')}
         />
       </div>
 
@@ -133,26 +141,27 @@ export const Header: React.FC<HeaderProps> = ({ onOpenWhatsAppSimulator }) => {
   );
 };
 
-const RoleTab: React.FC<{
+const RoleLink: React.FC<{
+  href: string;
   active: boolean;
   label: string;
   badge?: string;
   onClick: () => void;
-}> = ({ active, label, badge, onClick }) => (
-  <button
+}> = ({ href, active, label, badge, onClick }) => (
+  <Link
+    href={href}
     onClick={onClick}
     style={{
       padding: '5px 12px',
       fontSize: '0.78rem',
       fontWeight: active ? 600 : 400,
       borderRadius: '4px',
-      border: 'none',
       backgroundColor: active ? '#2563EB' : 'transparent',
       color: active ? '#FFFFFF' : '#9CA3AF',
-      cursor: 'pointer',
       display: 'flex',
       alignItems: 'center',
       gap: '6px',
+      textDecoration: 'none',
       transition: 'all 0.15s ease',
     }}
   >
@@ -171,5 +180,5 @@ const RoleTab: React.FC<{
         {badge}
       </span>
     )}
-  </button>
+  </Link>
 );
