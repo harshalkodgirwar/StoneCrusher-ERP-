@@ -1,0 +1,358 @@
+/* ==============================================================================
+   OWNER DASHBOARD - CRUSHER PLANT MANAGEMENT SYSTEM (MATCHING REFERENCE DESIGN)
+   ============================================================================== */
+
+.owner-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: #F4F7FC;
+  color: #1E293B;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* 1. Deep Blue Sidebar */
+.owner-sidebar {
+  width: 250px;
+  background-color: #0E2942;
+  color: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  border-right: 1px solid #1A3858;
+}
+
+.owner-sidebar-logo {
+  padding: 20px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.owner-logo-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+}
+
+.owner-logo-text {
+  line-height: 1.15;
+}
+
+.owner-logo-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #FFFFFF;
+}
+
+.owner-logo-sub {
+  font-size: 0.65rem;
+  color: #94A3B8;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.owner-nav-list {
+  list-style: none;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.owner-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 6px;
+  color: #94A3B8;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.owner-nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: #F8FAFC;
+}
+
+.owner-nav-item.active {
+  background-color: #193E64;
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.owner-nav-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 2. Main Content Area */
+.owner-main-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Top Navbar */
+.owner-topbar {
+  height: 60px;
+  background-color: #FFFFFF;
+  border-bottom: 1px solid #E5EAF2;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.owner-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.owner-layout-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #F1F5F9;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: #64748B;
+}
+
+.owner-breadcrumbs {
+  font-size: 0.8rem;
+  color: #64748B;
+  font-weight: 600;
+}
+
+.owner-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.owner-icon-btn {
+  background: none;
+  border: none;
+  color: #64748B;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.owner-icon-btn:hover {
+  background-color: #F1F5F9;
+  color: #1E293B;
+}
+
+.owner-user-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #1E293B;
+}
+
+.owner-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #E2E8F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #2563EB;
+  font-size: 0.8rem;
+}
+
+/* Main Dashboard Body */
+.owner-content-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Clean White Card */
+.owner-card {
+  background-color: #FFFFFF;
+  border-radius: 10px;
+  border: 1px solid #E5EAF2;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+  padding: 18px 20px;
+}
+
+.owner-card-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0F172A;
+  letter-spacing: -0.01em;
+  margin-bottom: 12px;
+}
+
+/* Vehicle Incoming / Outgoing Tiles */
+.owner-vehicle-grid {
+  display: grid;
+  grid-templateColumns: 1fr 1fr;
+  gap: 16px;
+}
+
+.owner-vehicle-tile {
+  background: #F8FAFC;
+  border: 1px solid #EEF2F6;
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.owner-vehicle-metric {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: #0F172A;
+  line-height: 1;
+}
+
+.owner-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 6px;
+}
+
+.owner-pill-cyan {
+  background: #E0F2FE;
+  color: #0284C7;
+}
+
+.owner-pill-red {
+  background: #FEE2E2;
+  color: #DC2626;
+}
+
+.owner-pill-green {
+  background: #DCFCE7;
+  color: #16A34A;
+}
+
+/* Progress Rings Container */
+.owner-overview-stats {
+  display: grid;
+  grid-templateColumns: repeat(3, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.owner-stat-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #F8FAFC;
+  border: 1px solid #EEF2F6;
+  border-radius: 8px;
+}
+
+/* Invoice List Table */
+.owner-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.owner-table th {
+  text-align: left;
+  color: #64748B;
+  font-weight: 600;
+  padding: 10px 12px;
+  background-color: #F8FAFC;
+  border-bottom: 1px solid #E5EAF2;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+
+.owner-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid #EEF2F6;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.owner-table tr:hover td {
+  background-color: #F8FAFC;
+}
+
+/* Invoices modal/overlay card styling */
+.owner-customer-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.owner-cust-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: #DBEAFE;
+  color: #1D4ED8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.owner-paid-badge {
+  background-color: #E0E7FF;
+  color: #4338CA;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* Plant Activity Pill */
+.owner-plant-activity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #F8FAFC;
+  border: 1px solid #EEF2F6;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+}
