@@ -28,7 +28,9 @@ import {
   AlertTriangle,
   Play,
   Calendar,
+  Database,
 } from 'lucide-react';
+import { DatabaseConfigView } from '../database/DatabaseConfigView';
 
 interface OwnerAdminDashboardProps {
   onOpenWhatsAppSimulator: () => void;
@@ -52,7 +54,8 @@ export const OwnerAdminDashboard: React.FC<OwnerAdminDashboardProps> = ({
     | 'TRANSPORTER'
     | 'REPORTS'
     | 'STORES'
-    | 'WHATSAPP';
+    | 'WHATSAPP'
+    | 'DATABASE';
 
   const [activeMenu, setActiveMenu] = useState<NavMenu>('DASHBOARD');
   const [paymentPeriod, setPaymentPeriod] = useState<'ALL' | '3M' | '6M' | '1Y'>('ALL');
@@ -288,6 +291,17 @@ export const OwnerAdminDashboard: React.FC<OwnerAdminDashboardProps> = ({
             {failedMessages.length > 0 && (
               <span className="owner-pill-badge owner-pill-red">{failedMessages.length}</span>
             )}
+          </li>
+
+          <li
+            className={`owner-nav-item ${activeMenu === 'DATABASE' ? 'active' : ''}`}
+            onClick={() => setActiveMenu('DATABASE')}
+          >
+            <div className="owner-nav-left">
+              <Database size={16} />
+              <span>Database Config</span>
+            </div>
+            <ChevronRight size={14} />
           </li>
         </ul>
 
@@ -1174,6 +1188,11 @@ export const OwnerAdminDashboard: React.FC<OwnerAdminDashboardProps> = ({
               </div>
             </div>
           )}
+
+          {/* ========================================================================= */}
+          {/* VIEW: DATABASE CONFIGURATION */}
+          {/* ========================================================================= */}
+          {activeMenu === 'DATABASE' && <DatabaseConfigView />}
         </div>
       </div>
     </div>
