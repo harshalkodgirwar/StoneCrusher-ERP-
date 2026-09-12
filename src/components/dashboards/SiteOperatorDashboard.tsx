@@ -10,15 +10,9 @@ import {
   FileCheck,
   Package,
   Wrench,
-  CheckCircle2,
-  ArrowRight,
-  ShieldCheck,
+  Check,
   RefreshCw,
-  Clock,
-  Sparkles,
-  Send,
   PlusCircle,
-  AlertTriangle,
 } from 'lucide-react';
 
 interface SiteOperatorDashboardProps {
@@ -34,18 +28,13 @@ export const SiteOperatorDashboard: React.FC<SiteOperatorDashboardProps> = ({
 }) => {
   const store = useCrusherStore();
 
-  // Active section tabs following the physical operational pipeline:
-  // NEXT TRIP -> DISPATCH QUEUE -> WEIGHBRIDGE -> INVENTORY -> GATE PASS -> SITE OPERATIONS
-  type SiteTab = 'PIPELINE' | 'WEIGHBRIDGE' | 'INVENTORY' | 'RAW_MATERIAL' | 'SPARE_PARTS';
-  const [activeTab, setActiveTab] = useState<SiteTab>('PIPELINE');
+  type SiteTab = 'SCALE' | 'INVENTORY' | 'RAW_MATERIAL' | 'SPARES';
+  const [activeTab, setActiveTab] = useState<SiteTab>('SCALE');
 
-  // Currently focused trip for scale operations
   const queuedTrips = store.trips.filter((t) => t.status !== 'DISPATCHED' && t.status !== 'CANCELLED');
   const nextTrip: Trip | undefined = queuedTrips[0];
-
   const [activeTripId, setActiveTripId] = useState<string>(nextTrip?.id || '');
 
-  // Keep activeTripId updated if nextTrip changes and nothing is selected
   useEffect(() => {
     if (!activeTripId && nextTrip?.id) {
       setActiveTripId(nextTrip.id);
@@ -54,64 +43,49 @@ export const SiteOperatorDashboard: React.FC<SiteOperatorDashboardProps> = ({
 
   const selectedTrip = store.trips.find((t) => t.id === activeTripId) || nextTrip;
 
-  // Digital Weighbridge Simulation State
+  // Scale simulation
   const [digitalScaleWeight, setDigitalScaleWeight] = useState<number>(0);
   const [isScaleFluctuating, setIsScaleFluctuating] = useState<boolean>(true);
   const [manualWeightInput, setManualWeightInput] = useState<string>('');
   const [useManualWeight, setUseManualWeight] = useState<boolean>(false);
 
-  // Raw Material Inward Form State
+  // Raw Material Inward
   const [rawSupplierId, setRawSupplierId] = useState(store.suppliers[0]?.id || '');
   const [rawMaterialId, setRawMaterialId] = useState(store.rawMaterials[0]?.id || '');
   const [rawTruckNo, setRawTruckNo] = useState('MH12XY4455');
   const [rawQtyBrass, setRawQtyBrass] = useState('15');
   const [rawRate, setRawRate] = useState('3200');
-  const [inwardSuccess, setInwardSuccess] = useState<string | null>(null);
 
-  // Spare Parts Usage State
+  // Spares
   const [sparePartId, setSparePartId] = useState(store.spareParts[0]?.id || '');
   const [spareQty, setSpareQty] = useState('1');
-  const [spareReason, setSpareReason] = useState('Routine 250-hour crusher jaw inspection & replacement');
+  const [spareReason, setSpareReason] = useState('Routine crusher maintenance');
 
-  // Weight simulation fluctuation effect
   useEffect(() => {
     if (!isScaleFluctuating) return;
 
     const interval = setInterval(() => {
-      // Simulate weight based on whether the truck is empty (tare ~10-12 MT) or loaded (~28-32 MT)
       let base = 0;
       if (selectedTrip) {
         if (selectedTrip.status === 'CALLED_TO_SCALE' || selectedTrip.status === 'QUEUED') {
-          // Empty truck entering
           const veh = store.vehicles.find((v) => v.id === selectedTrip.vehicleId);
           base = veh?.defaultTareWeightMt || 10.4;
         } else if (selectedTrip.status === 'LOADING' || selectedTrip.status === 'TARE_WEIGHED') {
-          // Loaded truck ready for gross scale
           const tare = selectedTrip.tareWeightMt || 10.4;
           base = tare + selectedTrip.orderedQtyMt;
         }
       }
 
       if (base > 0) {
-        // Subtle digital vibration +/- 0.04 MT
         const jitter = (Math.random() - 0.5) * 0.08;
         setDigitalScaleWeight(Number((base + jitter).toFixed(2)));
       } else {
         setDigitalScaleWeight(0.0);
       }
-    }, 450);
+    }, 500);
 
     return () => clearInterval(interval);
   }, [isScaleFluctuating, selectedTrip, store.vehicles]);
-
-  // Actions
-  const handleLockWeight = () => {
-    setIsScaleFluctuating(false);
-  };
-
-  const handleUnlockWeight = () => {
-    setIsScaleFluctuating(true);
-  };
 
   const getEffectiveWeight = (): number => {
     if (useManualWeight && manualWeightInput) {
@@ -123,15 +97,11 @@ export const SiteOperatorDashboard: React.FC<SiteOperatorDashboardProps> = ({
   const handleCaptureTare = (tripId: string) => {
     const weight = getEffectiveWeight();
     if (weight <= 0) {
-      alert('Scale reading is zero. Please ensure truck is stationary on platform.');
+      alert('Scale weight cannot be zero.');
       return;
     }
     crusherStore.recordTareWeight(tripId, weight);
     setIsScaleFluctuating(true);
-  };
-
-  const handleStartLoading = (tripId: string) => {
-    crusherStore.startLoading(tripId);
   };
 
   const handleCaptureGrossAndDeductInventory = (tripId: string) => {
@@ -143,11 +113,10 @@ export const SiteOperatorDashboard: React.FC<SiteOperatorDashboardProps> = ({
 
     const grossWeight = getEffectiveWeight();
     if (grossWeight <= trip.tareWeightMt) {
-      alert(`Gross weight (${grossWeight} MT) must be greater than Tare weight (${trip.tareWeightMt} MT).`);
+      alert(`Gross weight (${grossWeight} MT) must exceed Tare (${trip.tareWeightMt} MT).`);
       return;
     }
 
-    // Records gross weight, calculates net weight, and AUTOMATICALLY deducts product inventory!
     crusherStore.recordGrossWeight(tripId, grossWeight);
     setIsScaleFluctuating(true);
   };
@@ -157,14 +126,11 @@ export const SiteOperatorDashboard: React.FC<SiteOperatorDashboardProps> = ({
     onViewGatePass(gp.id);
   };
 
-  const handleRawMaterialSubmit = (e: React.FormEvent) => {
+  const handleRawSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const qty = parseFloat(rawQtyBrass);
     const rate = parseFloat(rawRate);
-    if (!rawSupplierId || !rawMaterialId || isNaN(qty) || qty <= 0) {
-      alert('Please fill valid raw material inward entries');
-      return;
-    }
+    if (!rawSupplierId || !rawMaterialId || isNaN(qty) || qty <= 0) return;
 
     const receipt = crusherStore.addRawMaterialInward({
       supplierId: rawSupplierId,
@@ -174,504 +140,312 @@ export const SiteOperatorDashboard: React.FC<SiteOperatorDashboardProps> = ({
       ratePerBrass: rate,
     });
 
-    setInwardSuccess(receipt.receiptNumber);
-    setTimeout(() => setInwardSuccess(null), 6000);
+    onViewReceipt(receipt.id);
   };
 
-  const handleConsumeSparePart = (e: React.FormEvent) => {
+  const handleSpareSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const qty = parseInt(spareQty, 10);
     if (isNaN(qty) || qty <= 0) return;
     crusherStore.consumeSparePart(sparePartId, qty, spareReason);
-    alert('Spare part maintenance log recorded successfully');
+    alert('Recorded spare part consumption.');
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Sequence Header Navigation */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* Top Bar with Pipeline Steps */}
       <div
-        className="crusher-card"
         style={{
-          padding: '16px 20px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
           gap: '12px',
-          borderLeft: '4px solid #10B981',
+          paddingBottom: '8px',
+          borderBottom: '1px solid #1F2937',
         }}
       >
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 800 }}>Site Operator Command Terminal</h2>
-            <span className="badge badge-emerald">Weighbridge & Quarry Floor</span>
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '0.75rem',
-              color: '#94A3B8',
-              marginTop: '4px',
-              fontFamily: 'monospace',
-            }}
-          >
-            <span style={{ color: '#F59E0B' }}>NEXT TRIP</span> →
-            <span style={{ color: '#60A5FA' }}>DISPATCH QUEUE</span> →
-            <span style={{ color: '#34D399' }}>WEIGHBRIDGE</span> →
-            <span style={{ color: '#F472B6' }}>INVENTORY DEDUCTION</span> →
-            <span style={{ color: '#A78BFA' }}>GATE PASS</span> →
-            <span style={{ color: '#E2E8F0' }}>SITE OPERATIONS</span>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Site Operations & Weighbridge</h2>
+          <div style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: '2px' }}>
+            Pipeline: Next Trip → Queue → Weighbridge → Inventory Deduction → Gate Pass → Operations
           </div>
         </div>
 
-        {/* View Tabs */}
         <div style={{ display: 'flex', gap: '6px' }}>
           <button
-            onClick={() => setActiveTab('PIPELINE')}
-            className={activeTab === 'PIPELINE' ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '6px 14px', fontSize: '0.8rem' }}
+            onClick={() => setActiveTab('SCALE')}
+            className={activeTab === 'SCALE' ? 'btn-primary' : 'btn-secondary'}
           >
-            <Truck size={14} /> Dispatch Pipeline ({queuedTrips.length})
+            <Scale size={14} /> Weighbridge ({queuedTrips.length})
           </button>
           <button
             onClick={() => setActiveTab('INVENTORY')}
             className={activeTab === 'INVENTORY' ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '6px 14px', fontSize: '0.8rem' }}
           >
-            <Layers size={14} /> Aggregate Stock
+            <Layers size={14} /> Inventory
           </button>
           <button
             onClick={() => setActiveTab('RAW_MATERIAL')}
             className={activeTab === 'RAW_MATERIAL' ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '6px 14px', fontSize: '0.8rem' }}
           >
-            <Package size={14} /> Raw Inward (Boulder)
+            <Package size={14} /> Raw Inward
           </button>
           <button
-            onClick={() => setActiveTab('SPARE_PARTS')}
-            className={activeTab === 'SPARE_PARTS' ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '6px 14px', fontSize: '0.8rem' }}
+            onClick={() => setActiveTab('SPARES')}
+            className={activeTab === 'SPARES' ? 'btn-primary' : 'btn-secondary'}
           >
-            <Wrench size={14} /> Crusher Spares
+            <Wrench size={14} /> Spares
           </button>
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* TAB 1: OPERATIONAL PIPELINE (NEXT TRIP -> QUEUE -> WEIGHBRIDGE -> PASS) */}
-      {/* ========================================================================= */}
-      {activeTab === 'PIPELINE' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* 1. NEXT TRIP PRIORITY CALLOUT */}
+      {/* SCALE & DISPATCH PIPELINE */}
+      {activeTab === 'SCALE' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Active / Next Trip Action Card */}
           {selectedTrip ? (
-            <div
-              className="crusher-card animate-slide-up"
-              style={{
-                backgroundColor: '#111C33',
-                border: '2px solid #29406B',
-                padding: '20px 24px',
-                borderRadius: '16px',
-                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.5)',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  flexWrap: 'wrap',
-                  gap: '16px',
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <span
-                      style={{
-                        backgroundColor: '#F59E0B',
-                        color: '#000',
-                        fontWeight: 900,
-                        fontSize: '0.75rem',
-                        padding: '3px 8px',
-                        borderRadius: '4px',
-                        letterSpacing: '1px',
-                      }}
-                    >
-                      NEXT TRIP IN QUEUE
-                    </span>
-                    <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#FFF' }}>
-                      {selectedTrip.tripNumber}
-                    </span>
-                    <span className="badge badge-amber">{selectedTrip.status}</span>
-                  </div>
-
-                  {(() => {
-                    const cust = store.customers.find((c) => c.id === selectedTrip.customerId);
-                    const prod = store.products.find((p) => p.id === selectedTrip.productId);
-                    const veh = store.vehicles.find((v) => v.id === selectedTrip.vehicleId);
-                    const drv = store.drivers.find((d) => d.id === selectedTrip.driverId);
-
-                    return (
-                      <div style={{ marginTop: '8px', fontSize: '0.85rem', color: '#CBD5E1' }}>
-                        <div>
-                          <strong style={{ color: '#FBBF24', fontSize: '1rem' }}>{cust?.companyName}</strong>
-                          {' • '}
-                          <span style={{ color: '#38BDF8', fontWeight: 700 }}>
-                            {prod?.name} ({selectedTrip.orderedQtyMt} MT)
-                          </span>
-                        </div>
-                        <div style={{ color: '#94A3B8', marginTop: '2px', fontSize: '0.78rem' }}>
-                          Truck: <strong style={{ color: '#34D399' }}>{veh?.plateNumber}</strong> ({veh?.vehicleType})
-                          {' • '}Driver: {drv?.name} ({drv?.phone})
-                          {' • '}Destination: {selectedTrip.destination}
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {/* Quick Action Progression Bar */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {selectedTrip.status === 'QUEUED' && (
-                    <button
-                      onClick={() => crusherStore.advanceTripToScale(selectedTrip.id)}
-                      className="btn-primary"
-                    >
-                      Call Vehicle to Weighbridge →
-                    </button>
-                  )}
-
-                  {selectedTrip.status === 'CALLED_TO_SCALE' && (
-                    <button
-                      onClick={() => handleCaptureTare(selectedTrip.id)}
-                      className="btn-primary"
-                    >
-                      <Scale size={16} /> Capture Empty Tare Weight ({getEffectiveWeight()} MT)
-                    </button>
-                  )}
-
-                  {selectedTrip.status === 'TARE_WEIGHED' && (
-                    <button
-                      onClick={() => handleStartLoading(selectedTrip.id)}
-                      className="btn-success"
-                    >
-                      Advance to Crusher Hopper Loading →
-                    </button>
-                  )}
-
-                  {selectedTrip.status === 'LOADING' && (
-                    <button
-                      onClick={() => handleCaptureGrossAndDeductInventory(selectedTrip.id)}
-                      className="btn-primary"
-                    >
-                      <Scale size={16} /> Capture Loaded Gross & Verify Net
-                    </button>
-                  )}
-
-                  {selectedTrip.status === 'GROSS_WEIGHED' && (
-                    <button
-                      onClick={() => handleGenerateGatePass(selectedTrip.id)}
-                      className="btn-success"
-                      style={{ background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)' }}
-                    >
-                      <FileCheck size={16} /> Issue Gate Pass & Dispatch via WhatsApp
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
             <div
               className="crusher-card"
               style={{
-                padding: '32px',
-                textAlign: 'center',
-                color: '#64748B',
-                fontSize: '0.9rem',
+                padding: '16px 20px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '14px',
+                borderLeft: '3px solid #2563EB',
               }}
             >
-              No trips in site queue. Waiting for Office Operator to create customer orders.
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#9CA3AF', fontWeight: 600, textTransform: 'uppercase' }}>
+                    Next Trip
+                  </span>
+                  <strong style={{ fontSize: '1.1rem', color: '#F9FAFB' }}>{selectedTrip.tripNumber}</strong>
+                  <span className="badge badge-amber">{selectedTrip.status}</span>
+                </div>
+
+                {(() => {
+                  const cust = store.customers.find((c) => c.id === selectedTrip.customerId);
+                  const prod = store.products.find((p) => p.id === selectedTrip.productId);
+                  const veh = store.vehicles.find((v) => v.id === selectedTrip.vehicleId);
+
+                  return (
+                    <div style={{ fontSize: '0.8rem', color: '#9CA3AF', marginTop: '4px' }}>
+                      <strong style={{ color: '#E5E7EB' }}>{cust?.companyName}</strong> • {prod?.name} ({selectedTrip.orderedQtyMt} MT)
+                      {' • '}Vehicle: <strong style={{ color: '#E5E7EB' }}>{veh?.plateNumber}</strong>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {selectedTrip.status === 'QUEUED' && (
+                  <button
+                    onClick={() => crusherStore.advanceTripToScale(selectedTrip.id)}
+                    className="btn-primary"
+                  >
+                    Call to Scale →
+                  </button>
+                )}
+
+                {selectedTrip.status === 'CALLED_TO_SCALE' && (
+                  <button
+                    onClick={() => handleCaptureTare(selectedTrip.id)}
+                    className="btn-primary"
+                  >
+                    Record Tare ({getEffectiveWeight()} MT)
+                  </button>
+                )}
+
+                {selectedTrip.status === 'TARE_WEIGHED' && (
+                  <button
+                    onClick={() => crusherStore.startLoading(selectedTrip.id)}
+                    className="btn-success"
+                  >
+                    Send to Loading Hopper →
+                  </button>
+                )}
+
+                {selectedTrip.status === 'LOADING' && (
+                  <button
+                    onClick={() => handleCaptureGrossAndDeductInventory(selectedTrip.id)}
+                    className="btn-primary"
+                  >
+                    Record Gross & Deduct Inventory
+                  </button>
+                )}
+
+                {selectedTrip.status === 'GROSS_WEIGHED' && (
+                  <button
+                    onClick={() => handleGenerateGatePass(selectedTrip.id)}
+                    className="btn-success"
+                  >
+                    <FileCheck size={14} /> Issue Gate Pass (WhatsApp)
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="crusher-card" style={{ padding: '24px', textAlign: 'center', color: '#6B7280', fontSize: '0.85rem' }}>
+              No trips currently waiting in the site queue.
             </div>
           )}
 
-          {/* 2. WEIGHBRIDGE STATION & LIVE FIFO QUEUE GRID */}
+          {/* Grid: Weighbridge Terminal + Queue */}
           <div
             style={{
               display: 'grid',
               gridTemplateColumns: '1.2fr 1fr',
-              gap: '24px',
+              gap: '16px',
               alignItems: 'start',
             }}
           >
-            {/* WEIGHBRIDGE TERMINAL */}
-            <div className="crusher-card" style={{ padding: '24px' }}>
+            {/* Terminal */}
+            <div className="crusher-card" style={{ padding: '18px' }}>
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginBottom: '16px',
-                  paddingBottom: '12px',
-                  borderBottom: '1px solid #1E293B',
+                  marginBottom: '12px',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Scale size={20} color="#10B981" />
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Weighbridge Digital Terminal</h3>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span className="pulse-dot online" />
-                  <span style={{ fontSize: '0.72rem', color: '#10B981', fontWeight: 600 }}>
-                    LOAD CELLS CALIBRATED
-                  </span>
+                <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>Weighbridge Scale Deck</div>
+                <div style={{ fontSize: '0.72rem', color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span className="status-dot online" /> Connected
                 </div>
               </div>
 
-              {/* Digital Scale Readout Display */}
-              <div className="digital-scale-display" style={{ marginBottom: '16px' }}>
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '8px',
-                    left: '12px',
-                    fontSize: '0.65rem',
-                    color: '#4ADE80',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                >
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22C55E' }} />
-                  LIVE METTLER TOLEDO 60T DECK
-                </div>
-
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '12px',
-                    fontSize: '0.65rem',
-                    color: isScaleFluctuating ? '#FACC15' : '#4ADE80',
-                    fontWeight: 700,
-                  }}
-                >
-                  {isScaleFluctuating ? '• LIVE MEASURING' : '• READING LOCKED'}
-                </div>
-
+              {/* Digital Display */}
+              <div className="digital-scale-display">
                 <div className="scale-readout">{getEffectiveWeight().toFixed(2)}</div>
-                <div className="scale-unit">Metric Tons (MT)</div>
+                <div className="scale-unit">Metric Tons</div>
               </div>
 
-              {/* Scale Controls: Lock / Zero / Manual */}
+              {/* Controls */}
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginBottom: '20px',
-                  flexWrap: 'wrap',
-                  gap: '8px',
+                  marginTop: '12px',
+                  fontSize: '0.75rem',
                 }}
               >
                 <div style={{ display: 'flex', gap: '6px' }}>
                   {isScaleFluctuating ? (
                     <button
-                      onClick={handleLockWeight}
+                      onClick={() => setIsScaleFluctuating(false)}
                       className="btn-secondary"
-                      style={{ padding: '6px 12px', fontSize: '0.75rem', borderColor: '#F59E0B', color: '#FBBF24' }}
+                      style={{ padding: '4px 10px', fontSize: '0.75rem' }}
                     >
-                      Lock Reading
+                      Hold
                     </button>
                   ) : (
                     <button
-                      onClick={handleUnlockWeight}
+                      onClick={() => setIsScaleFluctuating(true)}
                       className="btn-secondary"
-                      style={{ padding: '6px 12px', fontSize: '0.75rem', borderColor: '#10B981', color: '#34D399' }}
+                      style={{ padding: '4px 10px', fontSize: '0.75rem' }}
                     >
-                      <RefreshCw size={12} /> Unlock Live Sensor
+                      <RefreshCw size={11} /> Live
                     </button>
                   )}
-
                   <button
                     onClick={() => {
-                      setDigitalScaleWeight(0.0);
+                      setDigitalScaleWeight(0);
                       setManualWeightInput('');
                     }}
                     className="btn-secondary"
-                    style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                    style={{ padding: '4px 10px', fontSize: '0.75rem' }}
                   >
-                    Zero Scale
+                    Zero
                   </button>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', color: '#94A3B8', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <label style={{ color: '#9CA3AF', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={useManualWeight}
                       onChange={(e) => setUseManualWeight(e.target.checked)}
-                      style={{ marginRight: '6px' }}
+                      style={{ marginRight: '4px' }}
                     />
-                    Manual Override
+                    Manual
                   </label>
-
                   {useManualWeight && (
                     <input
                       type="number"
-                      step="0.01"
                       placeholder="MT"
                       value={manualWeightInput}
                       onChange={(e) => setManualWeightInput(e.target.value)}
                       className="input-field"
-                      style={{ width: '80px', padding: '4px 8px', fontSize: '0.78rem' }}
+                      style={{ width: '70px', padding: '3px 6px', fontSize: '0.75rem' }}
                     />
                   )}
                 </div>
               </div>
 
-              {/* Active Weighment Slip Summary for Selected Trip */}
+              {/* Trip Slip Metrics */}
               {selectedTrip && (
                 <div
                   style={{
-                    backgroundColor: '#0F1626',
-                    borderRadius: '10px',
-                    border: '1px solid #1F2E4A',
-                    padding: '16px',
+                    backgroundColor: '#0D1424',
+                    border: '1px solid #1F2937',
+                    borderRadius: '6px',
+                    padding: '12px',
+                    marginTop: '14px',
                   }}
                 >
                   <div
                     style={{
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      color: '#94A3B8',
-                      marginBottom: '12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>WEIGHMENT SLIP STATUS: {selectedTrip.tripNumber}</span>
-                    <span className="badge badge-slate">{selectedTrip.status}</span>
-                  </div>
-
-                  <div
-                    style={{
                       display: 'grid',
                       gridTemplateColumns: 'repeat(3, 1fr)',
-                      gap: '10px',
+                      gap: '8px',
                       textAlign: 'center',
-                      marginBottom: '14px',
+                      fontSize: '0.75rem',
                     }}
                   >
-                    <div style={{ background: '#141E33', padding: '8px', borderRadius: '6px' }}>
-                      <div style={{ fontSize: '0.68rem', color: '#94A3B8' }}>TARE WT (EMPTY)</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 800, color: '#F87171', marginTop: '2px' }}>
+                    <div style={{ background: '#161F30', padding: '6px', borderRadius: '4px' }}>
+                      <div style={{ color: '#9CA3AF' }}>Tare</div>
+                      <div style={{ fontWeight: 700, marginTop: '2px' }}>
                         {selectedTrip.tareWeightMt ? `${selectedTrip.tareWeightMt} MT` : '--'}
                       </div>
                     </div>
-
-                    <div style={{ background: '#141E33', padding: '8px', borderRadius: '6px' }}>
-                      <div style={{ fontSize: '0.68rem', color: '#94A3B8' }}>GROSS WT (LOADED)</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 800, color: '#60A5FA', marginTop: '2px' }}>
+                    <div style={{ background: '#161F30', padding: '6px', borderRadius: '4px' }}>
+                      <div style={{ color: '#9CA3AF' }}>Gross</div>
+                      <div style={{ fontWeight: 700, marginTop: '2px' }}>
                         {selectedTrip.grossWeightMt ? `${selectedTrip.grossWeightMt} MT` : '--'}
                       </div>
                     </div>
-
-                    <div
-                      style={{
-                        background: selectedTrip.netWeightMt ? '#064E3B' : '#141E33',
-                        padding: '8px',
-                        borderRadius: '6px',
-                        border: selectedTrip.netWeightMt ? '1px solid #10B981' : 'none',
-                      }}
-                    >
-                      <div style={{ fontSize: '0.68rem', color: selectedTrip.netWeightMt ? '#A7F3D0' : '#94A3B8' }}>
-                        NET DISPATCH
-                      </div>
-                      <div
-                        style={{
-                          fontSize: '1.1rem',
-                          fontWeight: 800,
-                          color: selectedTrip.netWeightMt ? '#34D399' : '#CBD5E1',
-                          marginTop: '2px',
-                        }}
-                      >
+                    <div style={{ background: '#161F30', padding: '6px', borderRadius: '4px' }}>
+                      <div style={{ color: '#34D399' }}>Net Dispatched</div>
+                      <div style={{ fontWeight: 700, color: '#34D399', marginTop: '2px' }}>
                         {selectedTrip.netWeightMt ? `${selectedTrip.netWeightMt} MT` : '--'}
                       </div>
                     </div>
-                  </div>
-
-                  {/* Operational Action Buttons per stage */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {selectedTrip.status === 'CALLED_TO_SCALE' && (
-                      <button
-                        onClick={() => handleCaptureTare(selectedTrip.id)}
-                        className="btn-primary"
-                        style={{ width: '100%', padding: '10px' }}
-                      >
-                        Capture Tare Weight: {getEffectiveWeight().toFixed(2)} MT
-                      </button>
-                    )}
-
-                    {selectedTrip.status === 'TARE_WEIGHED' && (
-                      <button
-                        onClick={() => handleStartLoading(selectedTrip.id)}
-                        className="btn-success"
-                        style={{ width: '100%', padding: '10px' }}
-                      >
-                        Truck Entering Plant → Start Aggregate Loading
-                      </button>
-                    )}
-
-                    {selectedTrip.status === 'LOADING' && (
-                      <button
-                        onClick={() => handleCaptureGrossAndDeductInventory(selectedTrip.id)}
-                        className="btn-primary"
-                        style={{ width: '100%', padding: '10px' }}
-                      >
-                        Capture Gross Weight & Deduct Inventory Automatically ({getEffectiveWeight().toFixed(2)} MT)
-                      </button>
-                    )}
-
-                    {selectedTrip.status === 'GROSS_WEIGHED' && (
-                      <button
-                        onClick={() => handleGenerateGatePass(selectedTrip.id)}
-                        className="btn-success"
-                        style={{ width: '100%', padding: '10px' }}
-                      >
-                        <ShieldCheck size={16} /> Generate Gate Pass & Dispatch via WhatsApp
-                      </button>
-                    )}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* FIFO DISPATCH QUEUE LIST */}
-            <div className="crusher-card" style={{ padding: '24px' }}>
+            {/* Queue */}
+            <div className="crusher-card" style={{ padding: '18px' }}>
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginBottom: '16px',
-                  paddingBottom: '12px',
-                  borderBottom: '1px solid #1E293B',
+                  marginBottom: '12px',
                 }}
               >
-                <div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Truck size={18} color="#F59E0B" /> FIFO Dispatch Queue
-                  </h3>
-                  <p style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: '2px' }}>
-                    Sequential site processing list
-                  </p>
-                </div>
-                <span className="badge badge-amber">{queuedTrips.length} Active</span>
+                <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>Site FIFO Queue</div>
+                <span className="badge badge-amber">{queuedTrips.length} Total</span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '520px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '420px', overflowY: 'auto' }}>
                 {queuedTrips.map((trip, idx) => {
                   const isSelected = trip.id === activeTripId;
                   const cust = store.customers.find((c) => c.id === trip.customerId);
@@ -683,61 +457,23 @@ export const SiteOperatorDashboard: React.FC<SiteOperatorDashboardProps> = ({
                       key={trip.id}
                       onClick={() => setActiveTripId(trip.id)}
                       style={{
-                        backgroundColor: isSelected ? '#1A294A' : '#0F1626',
-                        border: isSelected ? '2px solid #F59E0B' : '1px solid #1E2A44',
-                        borderRadius: '10px',
-                        padding: '12px 14px',
+                        backgroundColor: isSelected ? '#1E293B' : '#0D1424',
+                        border: isSelected ? '1px solid #2563EB' : '1px solid #1F2937',
+                        borderRadius: '6px',
+                        padding: '10px 12px',
                         cursor: 'pointer',
-                        transition: 'all 0.15s ease',
+                        fontSize: '0.78rem',
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span
-                            style={{
-                              backgroundColor: isSelected ? '#F59E0B' : '#334155',
-                              color: isSelected ? '#000' : '#FFF',
-                              fontWeight: 800,
-                              fontSize: '0.75rem',
-                              width: '24px',
-                              height: '24px',
-                              borderRadius: '4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            #{idx + 1}
-                          </span>
-                          <span style={{ fontWeight: 700, color: '#FFF' }}>{trip.tripNumber}</span>
+                        <div>
+                          <strong style={{ color: '#F3F4F6' }}>#{idx + 1} {trip.tripNumber}</strong>
+                          <span style={{ color: '#9CA3AF' }}> • {cust?.companyName}</span>
                         </div>
-                        <span className="badge badge-slate" style={{ fontSize: '0.62rem' }}>
-                          {trip.status}
-                        </span>
+                        <span className="badge badge-slate">{trip.status}</span>
                       </div>
-
-                      <div style={{ marginTop: '6px', fontSize: '0.78rem', color: '#CBD5E1' }}>
-                        <strong style={{ color: '#F59E0B' }}>{cust?.companyName}</strong>
-                        <span style={{ color: '#94A3B8' }}> • {prod?.name} ({trip.orderedQtyMt} MT)</span>
-                      </div>
-
-                      <div
-                        style={{
-                          marginTop: '4px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          fontSize: '0.7rem',
-                          color: '#64748B',
-                        }}
-                      >
-                        <span>Truck: {veh?.plateNumber}</span>
-                        <span>
-                          {trip.netWeightMt ? (
-                            <strong style={{ color: '#10B981' }}>Net: {trip.netWeightMt} MT</strong>
-                          ) : (
-                            <span>Ord: {trip.orderedQtyMt} MT</span>
-                          )}
-                        </span>
+                      <div style={{ color: '#9CA3AF', marginTop: '3px', fontSize: '0.72rem' }}>
+                        {prod?.name} ({trip.orderedQtyMt} MT) • Truck: {veh?.plateNumber}
                       </div>
                     </div>
                   );
@@ -748,436 +484,234 @@ export const SiteOperatorDashboard: React.FC<SiteOperatorDashboardProps> = ({
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 2: AGGREGATE INVENTORY (Live stock after automatic weighbridge deduction) */}
-      {/* ========================================================================= */}
+      {/* INVENTORY TAB */}
       {activeTab === 'INVENTORY' && (
-        <div className="crusher-card" style={{ padding: '24px' }}>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '20px',
-            }}
-          >
-            <div>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Layers size={20} color="#F59E0B" /> Finished Products Inventory Stock
-              </h3>
-              <p style={{ fontSize: '0.78rem', color: '#94A3B8', marginTop: '2px' }}>
-                Stock is deducted <strong style={{ color: '#10B981' }}>automatically</strong> upon verified gross weighbridge transaction.
-              </p>
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: '16px',
-            }}
-          >
-            {store.products.map((p) => {
-              const isLowStock = p.currentStockMt <= p.minThresholdMt;
-              const percentRemaining = Math.min(100, Math.round((p.currentStockMt / 600) * 100));
-
-              return (
-                <div
-                  key={p.id}
-                  style={{
-                    backgroundColor: '#0F1626',
-                    border: isLowStock ? '1px solid #EF4444' : '1px solid #1E2D4A',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {isLowStock && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        right: 0,
-                        background: '#EF4444',
-                        color: '#FFF',
-                        fontSize: '0.65rem',
-                        fontWeight: 800,
-                        padding: '2px 8px',
-                        borderBottomLeftRadius: '6px',
-                      }}
-                    >
-                      LOW STOCK ALERT
-                    </div>
-                  )}
-
-                  <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase' }}>{p.code}</div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#FFF', marginTop: '2px' }}>
-                    {p.name}
-                  </div>
-
-                  <div style={{ margin: '14px 0 8px', display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                    <span
-                      style={{
-                        fontSize: '2rem',
-                        fontWeight: 800,
-                        color: isLowStock ? '#EF4444' : '#10B981',
-                      }}
-                    >
-                      {p.currentStockMt.toFixed(1)}
-                    </span>
-                    <span style={{ color: '#94A3B8', fontSize: '0.85rem' }}>MT in Stock</span>
-                  </div>
-
-                  {/* Stock Bar */}
-                  <div style={{ height: '6px', backgroundColor: '#1E293B', borderRadius: '3px', overflow: 'hidden' }}>
-                    <div
-                      style={{
-                        height: '100%',
-                        width: `${percentRemaining}%`,
-                        backgroundColor: isLowStock ? '#EF4444' : '#10B981',
-                      }}
-                    />
-                  </div>
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      marginTop: '8px',
-                      fontSize: '0.72rem',
-                      color: '#94A3B8',
-                    }}
-                  >
-                    <span>Min Safety Threshold: {p.minThresholdMt} MT</span>
-                    <span>Rate: ₹{p.unitPriceInr}/MT</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+        <div className="crusher-card" style={{ padding: '18px' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '12px' }}>
+            Finished Aggregate Inventory (Auto-deducted upon gross weighment)
+          </h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+            <thead>
+              <tr style={{ textAlign: 'left', color: '#9CA3AF', borderBottom: '1px solid #1F2937' }}>
+                <th style={{ padding: '8px' }}>Product</th>
+                <th style={{ padding: '8px' }}>Unit</th>
+                <th style={{ padding: '8px' }}>Stock Available</th>
+                <th style={{ padding: '8px' }}>Min Threshold</th>
+                <th style={{ padding: '8px' }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {store.products.map((p) => {
+                const isLow = p.currentStockMt <= p.minThresholdMt;
+                return (
+                  <tr key={p.id} style={{ borderBottom: '1px solid #1F2937' }}>
+                    <td style={{ padding: '10px 8px', fontWeight: 500 }}>{p.name}</td>
+                    <td style={{ padding: '10px 8px', color: '#9CA3AF' }}>{p.unit}</td>
+                    <td style={{ padding: '10px 8px', fontWeight: 600 }}>{p.currentStockMt.toFixed(1)} MT</td>
+                    <td style={{ padding: '10px 8px', color: '#9CA3AF' }}>{p.minThresholdMt} MT</td>
+                    <td style={{ padding: '10px 8px' }}>
+                      {isLow ? (
+                        <span className="badge badge-crimson">Low Stock</span>
+                      ) : (
+                        <span className="badge badge-emerald">OK</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 3: RAW MATERIAL INWARD (Supplier/Labour receipt & WhatsApp trigger) */}
-      {/* ========================================================================= */}
+      {/* RAW MATERIAL INWARD TAB */}
       {activeTab === 'RAW_MATERIAL' && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(340px, 1fr) 1.25fr',
-            gap: '24px',
-            alignItems: 'start',
-          }}
-        >
-          {/* Form */}
-          <div className="crusher-card" style={{ padding: '24px' }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '16px',
-                paddingBottom: '12px',
-                borderBottom: '1px solid #1E293B',
-              }}
-            >
-              <Package size={20} color="#3B82F6" />
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Log Raw Material Inward (Boulder)</h3>
-            </div>
-            <p style={{ fontSize: '0.78rem', color: '#94A3B8', marginBottom: '16px' }}>
-              Submitting generates an official Inward Receipt and automatically sends the PDF receipt to the{' '}
-              <strong style={{ color: '#38BDF8' }}>Supplier via WhatsApp</strong>.
-            </p>
-
-            <form onSubmit={handleRawMaterialSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '16px' }}>
+          <div className="crusher-card" style={{ padding: '18px' }}>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '12px' }}>
+              Log Raw Boulder Inward
+            </h3>
+            <form onSubmit={handleRawSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
-                  Supplier / Labour Contractor *
-                </label>
+                <label style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Supplier *</label>
                 <select
                   className="input-field"
                   value={rawSupplierId}
                   onChange={(e) => setRawSupplierId(e.target.value)}
-                  required
                 >
                   {store.suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.phone})
-                    </option>
+                    <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
-                  Raw Material Type *
-                </label>
+                <label style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Material *</label>
                 <select
                   className="input-field"
                   value={rawMaterialId}
                   onChange={(e) => setRawMaterialId(e.target.value)}
-                  required
                 >
                   {store.rawMaterials.map((rm) => (
-                    <option key={rm.id} value={rm.id}>
-                      {rm.name} (Reserve: {rm.currentStockBrass} Brass)
-                    </option>
+                    <option key={rm.id} value={rm.id}>{rm.name} ({rm.currentStockBrass} Brass)</option>
                   ))}
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
-                    Truck / Dumper No *
-                  </label>
+                  <label style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Truck Plate</label>
                   <input
                     type="text"
                     className="input-field"
                     value={rawTruckNo}
                     onChange={(e) => setRawTruckNo(e.target.value)}
-                    required
                   />
                 </div>
-
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
-                    Quantity (Brass) *
-                  </label>
+                  <label style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Quantity (Brass)</label>
                   <input
                     type="number"
                     step="0.5"
                     className="input-field"
                     value={rawQtyBrass}
                     onChange={(e) => setRawQtyBrass(e.target.value)}
-                    required
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
-                  Contract Rate (₹ / Brass)
-                </label>
+                <label style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Rate (₹/Brass)</label>
                 <input
                   type="number"
                   className="input-field"
                   value={rawRate}
                   onChange={(e) => setRawRate(e.target.value)}
-                  required
                 />
               </div>
 
-              <button type="submit" className="btn-primary" style={{ padding: '10px', marginTop: '6px' }}>
-                <PlusCircle size={16} /> Record Inward & Send WhatsApp Receipt
+              <button type="submit" className="btn-primary" style={{ marginTop: '4px' }}>
+                Record Inward & Send WhatsApp Receipt
               </button>
             </form>
           </div>
 
-          {/* Receipts Archive */}
-          <div className="crusher-card" style={{ padding: '24px' }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '16px',
-                paddingBottom: '12px',
-                borderBottom: '1px solid #1E293B',
-              }}
-            >
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Inward Material Vouchers</h3>
-              <span className="badge badge-blue">{store.rawMaterialReceipts.length} Logged</span>
-            </div>
-
-            {store.rawMaterialReceipts.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '32px', color: '#64748B', fontSize: '0.85rem' }}>
-                No inward receipts recorded yet today. Submit the form on the left to receive boulder rocks.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {store.rawMaterialReceipts.map((rcpt) => (
-                  <div
-                    key={rcpt.id}
-                    style={{
-                      backgroundColor: '#0F1626',
-                      border: '1px solid #1E2B48',
-                      borderRadius: '8px',
-                      padding: '12px 16px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <strong style={{ color: '#38BDF8' }}>{rcpt.receiptNumber}</strong>
-                        <span className="badge badge-slate" style={{ fontSize: '0.65rem' }}>
-                          {rcpt.vehicleNumber}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '0.8rem', color: '#CBD5E1', marginTop: '2px' }}>
-                        {rcpt.supplierName} • {rcpt.rawMaterialName} (
-                        <strong style={{ color: '#F59E0B' }}>{rcpt.quantityBrass} Brass</strong>)
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: '#64748B' }}>
-                        Total Value: ₹{rcpt.totalAmount.toLocaleString()} • Time:{' '}
-                        {new Date(rcpt.inwardTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </div>
+          {/* Inward Vouchers */}
+          <div className="crusher-card" style={{ padding: '18px' }}>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '12px' }}>
+              Recent Inward Receipts
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {store.rawMaterialReceipts.map((rcpt) => (
+                <div
+                  key={rcpt.id}
+                  style={{
+                    backgroundColor: '#0D1424',
+                    border: '1px solid #1F2937',
+                    borderRadius: '6px',
+                    padding: '8px 12px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontSize: '0.78rem',
+                  }}
+                >
+                  <div>
+                    <strong>{rcpt.receiptNumber}</strong> • {rcpt.supplierName}
+                    <div style={{ color: '#9CA3AF', fontSize: '0.72rem' }}>
+                      {rcpt.rawMaterialName} ({rcpt.quantityBrass} Brass) • Truck: {rcpt.vehicleNumber}
                     </div>
-
-                    <button
-                      onClick={() => onViewReceipt(rcpt.id)}
-                      className="btn-secondary"
-                      style={{ padding: '6px 10px', fontSize: '0.72rem' }}
-                    >
-                      View Receipt PDF
-                    </button>
                   </div>
-                ))}
-              </div>
-            )}
+                  <button
+                    onClick={() => onViewReceipt(rcpt.id)}
+                    className="btn-secondary"
+                    style={{ padding: '3px 8px', fontSize: '0.72rem' }}
+                  >
+                    View PDF
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 4: CRUSHER SPARE PARTS & MAINTENANCE */}
-      {/* ========================================================================= */}
-      {activeTab === 'SPARE_PARTS' && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(320px, 1fr) 1.25fr',
-            gap: '24px',
-            alignItems: 'start',
-          }}
-        >
-          {/* Quick Consumption Form */}
-          <div className="crusher-card" style={{ padding: '24px' }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '16px',
-                paddingBottom: '12px',
-                borderBottom: '1px solid #1E293B',
-              }}
-            >
-              <Wrench size={20} color="#F59E0B" />
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Log Spare Part Consumption</h3>
-            </div>
-
-            <form onSubmit={handleConsumeSparePart} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      {/* SPARES TAB */}
+      {activeTab === 'SPARES' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '16px' }}>
+          <div className="crusher-card" style={{ padding: '18px' }}>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '12px' }}>
+              Log Spare Part Consumption
+            </h3>
+            <form onSubmit={handleSpareSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
-                  Select Spare Part *
-                </label>
+                <label style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Spare Part</label>
                 <select
                   className="input-field"
                   value={sparePartId}
                   onChange={(e) => setSparePartId(e.target.value)}
-                  required
                 >
                   {store.spareParts.map((sp) => (
-                    <option key={sp.id} value={sp.id}>
-                      {sp.name} (Stock: {sp.currentStock} in {sp.storageBin})
-                    </option>
+                    <option key={sp.id} value={sp.id}>{sp.name} (Qty: {sp.currentStock})</option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
-                  Quantity Replaced / Consumed *
-                </label>
+                <label style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Quantity Replaced</label>
                 <input
                   type="number"
                   min="1"
                   className="input-field"
                   value={spareQty}
                   onChange={(e) => setSpareQty(e.target.value)}
-                  required
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: '#94A3B8', marginBottom: '4px' }}>
-                  Maintenance Reason / Equipment
-                </label>
+                <label style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Reason / Notes</label>
                 <input
                   type="text"
                   className="input-field"
                   value={spareReason}
                   onChange={(e) => setSpareReason(e.target.value)}
-                  required
                 />
               </div>
 
-              <button type="submit" className="btn-secondary" style={{ padding: '10px', marginTop: '6px' }}>
-                <Wrench size={14} /> Record Spare Replacement
+              <button type="submit" className="btn-secondary" style={{ marginTop: '4px' }}>
+                Log Replacement
               </button>
             </form>
           </div>
 
-          {/* Spare Parts Grid */}
-          <div className="crusher-card" style={{ padding: '24px' }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '16px',
-                paddingBottom: '12px',
-                borderBottom: '1px solid #1E293B',
-              }}
-            >
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Crusher Spare Parts Inventory</h3>
-              <span className="badge badge-amber">{store.spareParts.length} Tracked</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {store.spareParts.map((sp) => {
-                const isLow = sp.currentStock <= sp.minThreshold;
-
-                return (
-                  <div
-                    key={sp.id}
-                    style={{
-                      backgroundColor: '#0F1626',
-                      border: isLow ? '1px solid #EF4444' : '1px solid #1E2B48',
-                      borderRadius: '8px',
-                      padding: '12px 16px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontWeight: 700, color: '#FFF' }}>{sp.name}</span>
-                        {isLow && <span className="badge badge-crimson">LOW SPARES</span>}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '2px' }}>
-                        Part No: {sp.partNumber} • Category: {sp.category} • Location: {sp.storageBin}
-                      </div>
-                    </div>
-
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '1.2rem', fontWeight: 800, color: isLow ? '#EF4444' : '#10B981' }}>
-                        {sp.currentStock} <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>units</span>
-                      </div>
-                      <div style={{ fontSize: '0.68rem', color: '#64748B' }}>
-                        Min Threshold: {sp.minThreshold}
-                      </div>
+          <div className="crusher-card" style={{ padding: '18px' }}>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '12px' }}>
+              Spare Parts Inventory
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {store.spareParts.map((sp) => (
+                <div
+                  key={sp.id}
+                  style={{
+                    backgroundColor: '#0D1424',
+                    border: '1px solid #1F2937',
+                    borderRadius: '6px',
+                    padding: '8px 12px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontSize: '0.78rem',
+                  }}
+                >
+                  <div>
+                    <strong>{sp.name}</strong>
+                    <div style={{ color: '#9CA3AF', fontSize: '0.72rem' }}>
+                      Part: {sp.partNumber} • Bin: {sp.storageBin}
                     </div>
                   </div>
-                );
-              })}
+                  <div style={{ fontWeight: 600 }}>{sp.currentStock} in stock</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

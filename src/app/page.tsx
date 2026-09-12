@@ -9,15 +9,12 @@ import { SiteOperatorDashboard } from '../components/dashboards/SiteOperatorDash
 import { WhatsAppSimulator } from '../components/whatsapp/WhatsAppSimulator';
 import { GatePassModal } from '../components/documents/GatePassModal';
 import { RawMaterialReceiptModal } from '../components/documents/RawMaterialReceiptModal';
-import { Smartphone, Layers } from 'lucide-react';
+import { Smartphone } from 'lucide-react';
 
 export default function Home() {
   const store = useCrusherStore();
 
-  // WhatsApp Virtual Simulator State
   const [isWhatsAppOpen, setIsWhatsAppOpen] = useState<boolean>(false);
-
-  // Modal documents state
   const [activeGatePassId, setActiveGatePassId] = useState<string | null>(null);
   const [activeReceiptId, setActiveReceiptId] = useState<string | null>(null);
 
@@ -34,11 +31,11 @@ export default function Home() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Top Header with Role Switcher & Live Indicators */}
+      {/* Top Header */}
       <Header onOpenWhatsAppSimulator={() => setIsWhatsAppOpen(true)} />
 
-      {/* Main Content Area */}
-      <main style={{ flex: 1, padding: '24px', maxWidth: '1600px', width: '100%', margin: '0 auto' }}>
+      {/* Main Container */}
+      <main style={{ flex: 1, padding: '16px 20px', maxWidth: '1440px', width: '100%', margin: '0 auto' }}>
         {store.currentRole === 'OWNER_ADMIN' && (
           <OwnerAdminDashboard
             onOpenWhatsAppSimulator={() => setIsWhatsAppOpen(true)}
@@ -63,82 +60,56 @@ export default function Home() {
         )}
       </main>
 
-      {/* Footer */}
+      {/* Clean Footer */}
       <footer
         style={{
-          borderTop: '1px solid #1E293B',
-          padding: '16px 24px',
+          borderTop: '1px solid #1F2937',
+          padding: '12px 20px',
           textAlign: 'center',
-          fontSize: '0.75rem',
-          color: '#64748B',
-          backgroundColor: '#070A12',
+          fontSize: '0.72rem',
+          color: '#6B7280',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-          <span>StoneCrusher Industrial ERP System • Next.js & Supabase Engine</span>
-          <span>•</span>
-          <span style={{ color: '#25D366' }}>External Portals Disabled (WhatsApp Notification Architecture V1)</span>
-        </div>
+        StoneCrusher ERP • Internal Dashboards Only • External Communication via WhatsApp
       </footer>
 
-      {/* Floating WhatsApp Quick Launcher Button */}
-      <div
+      {/* Discreet Floating Button */}
+      <button
+        onClick={() => setIsWhatsAppOpen(true)}
         style={{
           position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          zIndex: 999,
+          bottom: '16px',
+          right: '16px',
+          zIndex: 900,
+          backgroundColor: '#1F2937',
+          color: '#D1D5DB',
+          border: '1px solid #374151',
+          borderRadius: '20px',
+          padding: '6px 12px',
+          fontSize: '0.75rem',
+          fontWeight: 500,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          cursor: 'pointer',
         }}
       >
-        <button
-          onClick={() => setIsWhatsAppOpen(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
-            color: '#FFFFFF',
-            fontWeight: 700,
-            fontSize: '0.85rem',
-            padding: '12px 18px',
-            borderRadius: '9999px',
-            border: '2px solid rgba(255, 255, 255, 0.25)',
-            boxShadow: '0 10px 25px -3px rgba(37, 211, 102, 0.5)',
-            cursor: 'pointer',
-            transition: 'transform 0.15s ease',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
-          onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-        >
-          <Smartphone size={20} />
-          <span>WhatsApp Live Phone</span>
-          <span
-            style={{
-              backgroundColor: '#075E54',
-              padding: '2px 8px',
-              borderRadius: '12px',
-              fontSize: '0.72rem',
-            }}
-          >
-            {store.whatsappMessages.length}
-          </span>
-        </button>
-      </div>
+        <Smartphone size={13} color="#10B981" />
+        <span>WhatsApp ({store.whatsappMessages.length})</span>
+      </button>
 
-      {/* WhatsApp Virtual Simulator Modal */}
+      {/* Modals */}
       <WhatsAppSimulator
         isOpen={isWhatsAppOpen}
         onClose={() => setIsWhatsAppOpen(false)}
         onViewDocument={handleViewDocumentFromWhatsApp}
       />
 
-      {/* Printable / Viewable Gate Pass Modal */}
       <GatePassModal
         gatePassId={activeGatePassId}
         onClose={() => setActiveGatePassId(null)}
       />
 
-      {/* Printable / Viewable Raw Material Receipt Modal */}
       <RawMaterialReceiptModal
         receiptId={activeReceiptId}
         onClose={() => setActiveReceiptId(null)}
