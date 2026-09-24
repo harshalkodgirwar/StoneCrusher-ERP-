@@ -1,12 +1,27 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import './owner-dashboard.css';
-import { OwnerAdminDashboard } from '../../components/dashboards/OwnerAdminDashboard';
 import { WhatsAppSimulator } from '../../components/whatsapp/WhatsAppSimulator';
 import { GatePassModal } from '../../components/documents/GatePassModal';
 import { RawMaterialReceiptModal } from '../../components/documents/RawMaterialReceiptModal';
 import { crusherStore } from '../../lib/store/crusher-store';
+
+const OwnerAdminDashboard = dynamic(
+  () =>
+    import('../../components/dashboards/OwnerAdminDashboard').then(
+      (m) => m.OwnerAdminDashboard
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div style={{ minHeight: '100vh', backgroundColor: '#F4F7FC', padding: '40px', color: '#64748B' }}>
+        Loading Owner Executive Dashboard...
+      </div>
+    ),
+  }
+);
 
 export default function OwnerPage() {
   const [isWhatsAppOpen, setIsWhatsAppOpen] = useState(false);

@@ -38,7 +38,11 @@ export async function testSupabaseConnection(
   customKey?: string
 ): Promise<DatabaseStatus> {
   const url = customUrl || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const key = customKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  const key =
+    customKey ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    '';
 
   if (!url || !key) {
     return {
@@ -52,6 +56,13 @@ export async function testSupabaseConnection(
   try {
     const testClient = createClient(url, key, {
       auth: { persistSession: false },
+      global: {
+        fetch: (input, init) =>
+          fetch(input, {
+            ...init,
+            signal: AbortSignal.timeout(3000),
+          }),
+      },
     });
 
     // Test a basic query against products or staff_users

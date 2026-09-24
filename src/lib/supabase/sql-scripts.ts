@@ -1,10 +1,293 @@
--- ==============================================================================
--- STONECRUSHER ERP - REALISTIC CLIENT DEMO DATA
--- Pre-populates all 14 tables for "Shree Shivaji Stone Crusher & Mines, Pune"
--- Run AFTER running schema.sql
+// Master SQL Scripts for Supabase Setup and Client Demonstration
+
+export const SQL_COMPLETE_STRING = `-- ==============================================================================
+-- STONECRUSHER ERP - COMPLETE SUPABASE SETUP SCRIPT
+-- Contains All 14 Tables, Automated Triggers, and Full Client Demo Data
+-- Instructions: Copy and Run this in Supabase SQL Editor (1-Click Setup)
 -- ==============================================================================
 
--- 1. Staff Users (Internal internal_role)
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ==============================================================================
+-- PART 1: TABLE DEFINITIONS & ENUMS
+-- ==============================================================================
+
+-- 1. Internal Roles & Users (Internal only: Owner, Office Operator, Site Operator)
+DO $$ BEGIN
+    CREATE TYPE internal_role AS ENUM ('OWNER_ADMIN', 'OFFICE_OPERATOR', 'SITE_OPERATOR');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS staff_users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    phone VARCHAR(20),
+    role internal_role NOT NULL DEFAULT 'SITE_OPERATOR',
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 2. Customers (NO ERP LOGIN - WhatsApp target)
+CREATE TABLE IF NOT EXISTS customers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    company_name VARCHAR(255) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    email VARCHAR(255),
+    gst_number VARCHAR(50),
+    billing_address TEXT NOT NULL,
+    current_balance NUMERIC(12, 2) DEFAULT 0.00,
+    credit_limit NUMERIC(12, 2) DEFAULT 100000.00,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 3. Drivers (NO ERP LOGIN - WhatsApp target)
+CREATE TABLE IF NOT EXISTS drivers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    license_number VARCHAR(100) NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 4. Vehicles (Fleet & Transporters)
+CREATE TABLE IF NOT EXISTS vehicles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    plate_number VARCHAR(50) UNIQUE NOT NULL,
+    vehicle_type VARCHAR(50) DEFAULT 'Tipper 10-Wheeler',
+    default_tare_weight_mt NUMERIC(8, 2) DEFAULT 10.50,
+    max_capacity_mt NUMERIC(8, 2) DEFAULT 25.00,
+    assigned_driver_id UUID REFERENCES drivers(id) ON DELETE SET NULL,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 5. Finished Aggregate Products
+CREATE TABLE IF NOT EXISTS products (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    code VARCHAR(50) UNIQUE NOT NULL,
+    unit VARCHAR(20) NOT NULL DEFAULT 'MT',
+    current_stock_mt NUMERIC(12, 2) NOT NULL DEFAULT 500.00,
+    min_threshold_mt NUMERIC(12, 2) NOT NULL DEFAULT 100.00,
+    unit_price_inr NUMERIC(10, 2) NOT NULL DEFAULT 650.00,
+    description TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 6. Raw Materials (Boulders in Brass/MT)
+CREATE TABLE IF NOT EXISTS raw_materials (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    code VARCHAR(50) UNIQUE NOT NULL,
+    unit VARCHAR(20) NOT NULL DEFAULT 'Brass',
+    current_stock_brass NUMERIC(12, 2) NOT NULL DEFAULT 250.00,
+    min_threshold_brass NUMERIC(12, 2) NOT NULL DEFAULT 50.00,
+    unit_rate_inr NUMERIC(10, 2) NOT NULL DEFAULT 2800.00,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 7. Suppliers & Labour Contractors (NO ERP LOGIN - WhatsApp receipt target)
+CREATE TABLE IF NOT EXISTS suppliers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    contact_person VARCHAR(255),
+    phone VARCHAR(20) NOT NULL,
+    supplier_type VARCHAR(50) DEFAULT 'Quarry Raw Material',
+    balance_payable NUMERIC(12, 2) DEFAULT 0.00,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 8. Spare Parts & Maintenance Inventory
+CREATE TABLE IF NOT EXISTS spare_parts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    part_number VARCHAR(100),
+    category VARCHAR(100) DEFAULT 'Crusher Mechanical',
+    current_stock INT NOT NULL DEFAULT 2,
+    min_threshold INT NOT NULL DEFAULT 1,
+    unit_cost_inr NUMERIC(10, 2) NOT NULL DEFAULT 15000.00,
+    storage_bin VARCHAR(50) DEFAULT 'Main Shed - Rack B',
+    last_replaced_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 9. Trips & FIFO Dispatch Queue
+DO $$ BEGIN
+    CREATE TYPE trip_status AS ENUM (
+        'QUEUED',
+        'DISPATCHED',
+        'COMPLETED'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS trips (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    trip_number VARCHAR(50) UNIQUE NOT NULL,
+    customer_id UUID NOT NULL REFERENCES customers(id),
+    product_id UUID NOT NULL REFERENCES products(id),
+    ordered_qty_mt NUMERIC(8, 2) NOT NULL,
+    vehicle_id UUID REFERENCES vehicles(id),
+    driver_id UUID REFERENCES drivers(id),
+    destination VARCHAR(255) NOT NULL,
+    required_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    status trip_status NOT NULL DEFAULT 'QUEUED',
+    fifo_sequence INT NOT NULL DEFAULT 1,
+    created_by UUID REFERENCES staff_users(id),
+    tare_weight_mt NUMERIC(8, 2),
+    gross_weight_mt NUMERIC(8, 2),
+    net_weight_mt NUMERIC(8, 2),
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    dispatched_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_trips_fifo ON trips(status, fifo_sequence ASC, created_at ASC);
+
+-- 10. Weighbridge Transactions
+CREATE TABLE IF NOT EXISTS weighbridge_transactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    slip_number VARCHAR(50) UNIQUE NOT NULL,
+    trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+    vehicle_plate VARCHAR(50) NOT NULL,
+    tare_weight_mt NUMERIC(8, 2) NOT NULL,
+    tare_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    gross_weight_mt NUMERIC(8, 2),
+    gross_timestamp TIMESTAMPTZ,
+    net_weight_mt NUMERIC(8, 2),
+    operator_id UUID REFERENCES staff_users(id),
+    is_verified BOOLEAN NOT NULL DEFAULT false,
+    inventory_deducted BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 11. Gate Passes (Official Dispatched Slips)
+CREATE TABLE IF NOT EXISTS gate_passes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    gate_pass_number VARCHAR(50) UNIQUE NOT NULL,
+    trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+    weighbridge_id UUID REFERENCES weighbridge_transactions(id),
+    customer_name VARCHAR(255) NOT NULL,
+    vehicle_plate VARCHAR(50) NOT NULL,
+    driver_name VARCHAR(255) NOT NULL,
+    product_name VARCHAR(100) NOT NULL,
+    net_weight_mt NUMERIC(8, 2) NOT NULL,
+    destination VARCHAR(255) NOT NULL,
+    qr_code_payload TEXT,
+    pdf_url TEXT,
+    issued_by UUID REFERENCES staff_users(id),
+    issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 12. Raw Material Inward Receipts (Supplier / Labour)
+CREATE TABLE IF NOT EXISTS raw_material_receipts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    receipt_number VARCHAR(50) UNIQUE NOT NULL,
+    supplier_id UUID NOT NULL REFERENCES suppliers(id),
+    raw_material_id UUID NOT NULL REFERENCES raw_materials(id),
+    vehicle_number VARCHAR(50) NOT NULL,
+    quantity_brass NUMERIC(8, 2) NOT NULL,
+    rate_per_brass NUMERIC(10, 2) NOT NULL,
+    total_amount NUMERIC(12, 2) NOT NULL,
+    inward_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    received_by UUID REFERENCES staff_users(id),
+    pdf_url TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 13. WhatsApp Delivery Tracking (Decoupled Notification Engine)
+DO $$ BEGIN
+    CREATE TYPE whatsapp_recipient_type AS ENUM ('CUSTOMER', 'DRIVER', 'SUPPLIER', 'OWNER');
+    CREATE TYPE whatsapp_message_status AS ENUM ('PENDING', 'SENT', 'DELIVERED', 'READ', 'FAILED');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS whatsapp_messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    recipient_phone VARCHAR(25) NOT NULL,
+    recipient_type whatsapp_recipient_type NOT NULL,
+    recipient_name VARCHAR(255),
+    message_type VARCHAR(50) NOT NULL DEFAULT 'TEXT',
+    template_name VARCHAR(100) NOT NULL,
+    message_body TEXT NOT NULL,
+    document_url TEXT,
+    document_filename VARCHAR(255),
+    related_entity VARCHAR(50),
+    related_entity_id VARCHAR(100),
+    status whatsapp_message_status NOT NULL DEFAULT 'PENDING',
+    provider_message_id VARCHAR(100),
+    retry_count INT NOT NULL DEFAULT 0,
+    failure_reason TEXT,
+    sent_at TIMESTAMPTZ,
+    delivered_at TIMESTAMPTZ,
+    read_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 14. Audit Logs (System Action History)
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_name VARCHAR(255) NOT NULL DEFAULT 'System',
+    user_role VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
+    action VARCHAR(100) NOT NULL,
+    entity VARCHAR(50) NOT NULL,
+    entity_id VARCHAR(100),
+    details JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ==============================================================================
+-- PART 2: AUTOMATIC INVENTORY DEDUCTION TRIGGER
+-- Deducts finished product stock by Net Weight MT upon weighbridge verification
+-- ==============================================================================
+
+CREATE OR REPLACE FUNCTION trigger_deduct_inventory_on_weighbridge()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_product_id UUID;
+    v_net_weight NUMERIC(8, 2);
+BEGIN
+    IF NEW.gross_weight_mt IS NOT NULL AND NEW.is_verified = true AND (OLD.inventory_deducted IS DISTINCT FROM true) THEN
+        v_net_weight := NEW.gross_weight_mt - NEW.tare_weight_mt;
+        NEW.net_weight_mt := v_net_weight;
+
+        SELECT product_id INTO v_product_id FROM trips WHERE id = NEW.trip_id;
+
+        IF v_product_id IS NOT NULL THEN
+            UPDATE products 
+            SET current_stock_mt = GREATEST(0, current_stock_mt - v_net_weight),
+                updated_at = NOW()
+            WHERE id = v_product_id;
+
+            NEW.inventory_deducted := true;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_weighbridge_inventory_deduct ON weighbridge_transactions;
+CREATE TRIGGER trg_weighbridge_inventory_deduct
+BEFORE UPDATE OR INSERT ON weighbridge_transactions
+FOR EACH ROW
+EXECUTE FUNCTION trigger_deduct_inventory_on_weighbridge();
+
+-- ==============================================================================
+-- PART 3: REALISTIC CLIENT DEMO DATA
+-- ==============================================================================
+
+-- 1. Staff Users
 INSERT INTO staff_users (id, email, full_name, phone, role) VALUES
 ('11111111-1111-1111-1111-111111111111', 'owner@stonecrusher.com', 'Vikramaditya Shinde', '+919822011223', 'OWNER_ADMIN'),
 ('22222222-2222-2222-2222-222222222222', 'office@stonecrusher.com', 'Amit Patil', '+919822033445', 'OFFICE_OPERATOR'),
@@ -101,4 +384,14 @@ INSERT INTO whatsapp_messages (id, recipient_phone, recipient_type, recipient_na
 ('ea000003-0000-0000-0000-000000000003', '+919922887766', 'SUPPLIER', 'Sahyadri Mining Contractors', 'DOCUMENT', 'SUPPLIER_RECEIPT', 'Raw Material Receipt\n\nReceipt No: RM-2026-000001\n\nSupplier: Sahyadri Mining Contractors\nVehicle: MH12XY4455\nMaterial: Black Basalt Boulder\nQuantity: 15 Brass\n\nReceipt attached.', 'RM-2026-000001.pdf', 'DELIVERED', NOW()),
 ('ea000004-0000-0000-0000-000000000004', '+919822011223', 'OWNER', 'Vikramaditya Shinde (Owner)', 'TEXT', 'OWNER_DISPATCH_ALERT', 'Dispatch Completed\n\nTrip: TRP-2026-000001\nCustomer: ABC Construction Infra Ltd\nVehicle: MH12AB1234\nProduct: 20mm Aggregate\nQuantity: 20 MT\nGate Pass: GP-2026-000001\n\nInventory Updated:\nBefore: 500 MT\nAfter: 480 MT', NULL, 'DELIVERED', NOW())
 ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status;
+`;
+
+export const SQL_SCHEMA_STRING = `-- STONECRUSHER ERP - 14 TABLES & TRIGGER SCHEMA
+${SQL_COMPLETE_STRING.split('-- PART 3: REALISTIC CLIENT DEMO DATA')[0]}
+`;
+
+export const SQL_SEED_STRING = `-- STONECRUSHER ERP - REALISTIC CLIENT DEMO DATA
+-- Part 3 of Complete Setup
+${SQL_COMPLETE_STRING.split('-- PART 3: REALISTIC CLIENT DEMO DATA')[1] ? '-- PART 3: REALISTIC CLIENT DEMO DATA' + SQL_COMPLETE_STRING.split('-- PART 3: REALISTIC CLIENT DEMO DATA')[1] : ''}
+`;
 

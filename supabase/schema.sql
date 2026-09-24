@@ -120,14 +120,9 @@ CREATE TABLE IF NOT EXISTS spare_parts (
 -- ------------------------------------------------------------------------------
 
 CREATE TYPE trip_status AS ENUM (
-    'QUEUED',           -- Created by Office Operator, waiting in FIFO queue
-    'CALLED_TO_SCALE',  -- Site Operator signaled truck to weighbridge
-    'TARE_WEIGHED',     -- Empty tare recorded
-    'LOADING',          -- Loading aggregate under hopper
-    'GROSS_WEIGHED',    -- Loaded gross recorded & verified
-    'GATE_PASS_ISSUED', -- Gate Pass generated
-    'DISPATCHED',       -- Exited crusher site
-    'CANCELLED'
+    'QUEUED',           -- Waiting in yard / weighbridge queue
+    'DISPATCHED',       -- Gate pass issued, truck exited crusher site
+    'COMPLETED'         -- Material delivered and confirmed
 );
 
 CREATE TABLE IF NOT EXISTS trips (
@@ -136,9 +131,10 @@ CREATE TABLE IF NOT EXISTS trips (
     customer_id UUID NOT NULL REFERENCES customers(id),
     product_id UUID NOT NULL REFERENCES products(id),
     ordered_qty_mt NUMERIC(8, 2) NOT NULL,
-    vehicle_id UUID NOT NULL REFERENCES vehicles(id),
-    driver_id UUID NOT NULL REFERENCES drivers(id),
+    vehicle_id UUID REFERENCES vehicles(id), -- Assigned dynamically by site scale operator
+    driver_id UUID REFERENCES drivers(id),   -- Assigned dynamically by site scale operator
     destination VARCHAR(255) NOT NULL,
+    required_date DATE NOT NULL DEFAULT CURRENT_DATE,
     status trip_status NOT NULL DEFAULT 'QUEUED',
     fifo_sequence INT NOT NULL DEFAULT 1,
     created_by UUID REFERENCES staff_users(id),

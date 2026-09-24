@@ -30,6 +30,7 @@ Trip ID: {{tripId}}
 Product: {{productName}}
 Quantity: {{quantity}}
 Vehicle: {{vehicleNumber}}
+Required Delivery: {{requiredDate}}
 Status: Queued
 
 You will receive another notification when your material is dispatched.`,

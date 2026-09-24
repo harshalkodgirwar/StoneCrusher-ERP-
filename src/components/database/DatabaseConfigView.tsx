@@ -15,6 +15,12 @@ import {
   FileCode,
   Save,
 } from 'lucide-react';
+import {
+  SQL_COMPLETE_STRING,
+  SQL_SCHEMA_STRING,
+  SQL_SEED_STRING,
+} from '@/lib/supabase/sql-scripts';
+import { crusherStore } from '@/lib/store/crusher-store';
 
 export const DatabaseConfigView: React.FC = () => {
   const [supabaseUrl, setSupabaseUrl] = useState('');
@@ -30,7 +36,28 @@ export const DatabaseConfigView: React.FC = () => {
 
   const [copiedSql, setCopiedSql] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [activeSqlTab, setActiveSqlTab] = useState<'SCHEMA' | 'SEED'>('SCHEMA');
+  const [activeSqlTab, setActiveSqlTab] = useState<'COMPLETE' | 'SCHEMA' | 'SEED'>('COMPLETE');
+
+  // Live Data Explorer State
+  const [selectedTable, setSelectedTable] = useState<string>('customers');
+  const [tableData, setTableData] = useState<Record<string, any[]>>({});
+  const [isLoadingTableData, setIsLoadingTableData] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+
+  const fetchTableData = async () => {
+    setIsLoadingTableData(true);
+    try {
+      const res = await fetch('/api/database/sync', { signal: AbortSignal.timeout(3500) });
+      const json = await res.json();
+      if (json.rawRows) {
+        setTableData(json.rawRows);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch raw rows:', e);
+    } finally {
+      setIsLoadingTableData(false);
+    }
+  };
 
   // Load initial status
   useEffect(() => {
@@ -45,7 +72,17 @@ export const DatabaseConfigView: React.FC = () => {
       .catch((err) => {
         console.error('Failed to load database status:', err);
       });
+
+    fetchTableData();
   }, []);
+
+  const handleSyncToStore = async () => {
+    setSyncStatus('Syncing with ERP stores...');
+    await crusherStore.syncWithSupabase();
+    await fetchTableData();
+    setSyncStatus('✓ ERP views and dashboards successfully updated with live Supabase data!');
+    setTimeout(() => setSyncStatus(null), 4000);
+  };
 
   const handleTestConnection = async (saveToEnv = false) => {
     setIsTesting(true);
@@ -80,8 +117,11 @@ export const DatabaseConfigView: React.FC = () => {
     }
   };
 
-  const handleCopySql = (type: 'SCHEMA' | 'SEED') => {
-    const textToCopy = type === 'SCHEMA' ? SQL_SCHEMA_STRING : SQL_SEED_STRING;
+  const handleCopySql = (type: 'COMPLETE' | 'SCHEMA' | 'SEED') => {
+    let textToCopy = SQL_COMPLETE_STRING;
+    if (type === 'SCHEMA') textToCopy = SQL_SCHEMA_STRING;
+    if (type === 'SEED') textToCopy = SQL_SEED_STRING;
+
     navigator.clipboard.writeText(textToCopy);
     setCopiedSql(true);
     setTimeout(() => setCopiedSql(false), 3000);
@@ -284,12 +324,31 @@ export const DatabaseConfigView: React.FC = () => {
           <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid #EEF2F6' }} />
 
           {/* Step 2: SQL Migration Helper */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
             <div className="owner-card-title" style={{ margin: 0 }}>
-              2. Database Schema & Migration SQL
+              2. Database Schema & Demo SQL
             </div>
 
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setActiveSqlTab('COMPLETE')}
+                style={{
+                  background: activeSqlTab === 'COMPLETE' ? '#2563EB' : '#F1F5F9',
+                  color: activeSqlTab === 'COMPLETE' ? '#FFF' : '#64748B',
+                  border: 'none',
+                  padding: '4px 10px',
+                  borderRadius: '4px',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <span>complete_setup.sql</span>
+                <span style={{ fontSize: '0.62rem', background: activeSqlTab === 'COMPLETE' ? '#1D4ED8' : '#E2E8F0', padding: '1px 5px', borderRadius: '3px' }}>1-Click All</span>
+              </button>
               <button
                 onClick={() => setActiveSqlTab('SCHEMA')}
                 style={{
@@ -324,7 +383,7 @@ export const DatabaseConfigView: React.FC = () => {
           </div>
 
           <p style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '10px' }}>
-            In Supabase, open <strong>SQL Editor</strong>, paste this script, and click <strong>Run</strong>.
+            In Supabase, open <strong>SQL Editor</strong>, paste this script, and click <strong>Run</strong>. (Includes 14 tables, triggers, and full client demo data).
           </p>
 
           <div style={{ position: 'relative' }}>
@@ -349,7 +408,7 @@ export const DatabaseConfigView: React.FC = () => {
               }}
             >
               {copiedSql ? <Check size={14} /> : <Copy size={14} />}
-              <span>{copiedSql ? 'Copied to Clipboard!' : `Copy ${activeSqlTab.toLowerCase()}.sql`}</span>
+              <span>{copiedSql ? 'Copied to Clipboard!' : `Copy ${activeSqlTab === 'COMPLETE' ? 'complete_setup.sql' : activeSqlTab.toLowerCase() + '.sql'}`}</span>
             </button>
 
             <pre
@@ -365,7 +424,11 @@ export const DatabaseConfigView: React.FC = () => {
                 lineHeight: 1.4,
               }}
             >
-              {activeSqlTab === 'SCHEMA' ? SQL_SCHEMA_STRING.slice(0, 800) + '\n\n-- ... [Click Copy button above for full schema with triggers] ...' : SQL_SEED_STRING}
+              {activeSqlTab === 'COMPLETE'
+                ? SQL_COMPLETE_STRING.slice(0, 900) + '\n\n-- ... [Click "Copy complete_setup.sql" button above for the full 14 tables + triggers + demo data] ...'
+                : activeSqlTab === 'SCHEMA'
+                ? SQL_SCHEMA_STRING.slice(0, 800) + '\n\n-- ... [Click Copy button above for full schema with triggers] ...'
+                : SQL_SEED_STRING}
             </pre>
           </div>
         </div>
@@ -431,283 +494,192 @@ export const DatabaseConfigView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* 3. Live Supabase Data Explorer (Interactive Data Viewer) */}
+      <div className="owner-card" style={{ marginTop: '10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
+          <div>
+            <div className="owner-card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Database size={16} color="#2563EB" />
+              <span>3. Live Supabase Data Explorer</span>
+              <span style={{ fontSize: '0.68rem', backgroundColor: '#DCFCE7', color: '#16A34A', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>
+                ● Real PostgreSQL Data
+              </span>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
+              Inspect and verify the records currently stored in your live Supabase database tables.
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleSyncToStore}
+              style={{
+                backgroundColor: '#10B981',
+                color: '#FFF',
+                border: 'none',
+                padding: '7px 12px',
+                borderRadius: '6px',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <RefreshCw size={13} />
+              <span>Sync with ERP Views</span>
+            </button>
+            <button
+              onClick={fetchTableData}
+              disabled={isLoadingTableData}
+              style={{
+                backgroundColor: '#F1F5F9',
+                color: '#1E293B',
+                border: '1px solid #CBD5E1',
+                padding: '7px 12px',
+                borderRadius: '6px',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <RefreshCw size={13} className={isLoadingTableData ? 'animate-spin' : ''} />
+              <span>Reload Table Rows</span>
+            </button>
+          </div>
+        </div>
+
+        {syncStatus && (
+          <div style={{ padding: '8px 12px', backgroundColor: '#DCFCE7', color: '#15803D', fontSize: '0.75rem', borderRadius: '6px', marginBottom: '12px', fontWeight: 600 }}>
+            {syncStatus}
+          </div>
+        )}
+
+        {/* Table Selector Pills */}
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '14px' }}>
+          {[
+            { id: 'customers', label: 'customers', count: tableData.customers?.length ?? 7 },
+            { id: 'trips', label: 'trips', count: tableData.trips?.length ?? 9 },
+            { id: 'vehicles', label: 'vehicles', count: tableData.vehicles?.length ?? 6 },
+            { id: 'drivers', label: 'drivers', count: tableData.drivers?.length ?? 6 },
+            { id: 'products', label: 'products', count: tableData.products?.length ?? 6 },
+            { id: 'weighbridge_transactions', label: 'weighbridge_transactions', count: tableData.weighbridge_transactions?.length ?? 5 },
+            { id: 'whatsapp_messages', label: 'whatsapp_messages', count: tableData.whatsapp_messages?.length ?? 6 },
+            { id: 'audit_logs', label: 'audit_logs', count: tableData.audit_logs?.length ?? 12 },
+            { id: 'raw_materials', label: 'raw_materials', count: tableData.raw_materials?.length ?? 2 },
+            { id: 'suppliers', label: 'suppliers', count: tableData.suppliers?.length ?? 2 },
+            { id: 'raw_material_receipts', label: 'raw_material_receipts', count: tableData.raw_material_receipts?.length ?? 2 },
+            { id: 'spare_parts', label: 'spare_parts', count: tableData.spare_parts?.length ?? 4 },
+          ].map((t) => {
+            const isSelected = selectedTable === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setSelectedTable(t.id)}
+                style={{
+                  background: isSelected ? '#0F2D4A' : '#F8FAFC',
+                  color: isSelected ? '#FFF' : '#334155',
+                  border: isSelected ? '1px solid #0F2D4A' : '1px solid #E2E8F0',
+                  padding: '6px 12px',
+                  borderRadius: '20px',
+                  fontSize: '0.74rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span>{t.label}</span>
+                <span
+                  style={{
+                    background: isSelected ? '#2563EB' : '#E2E8F0',
+                    color: isSelected ? '#FFF' : '#475569',
+                    fontSize: '0.65rem',
+                    padding: '1px 6px',
+                    borderRadius: '10px',
+                    fontWeight: 700,
+                  }}
+                >
+                  {t.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Data Table View */}
+        <div style={{ overflowX: 'auto', maxHeight: '350px', border: '1px solid #E2E8F0', borderRadius: '6px' }}>
+          {(() => {
+            const rows = tableData[selectedTable] || [];
+            if (rows.length === 0) {
+              return (
+                <div style={{ padding: '24px', textAlign: 'center', color: '#64748B', fontSize: '0.8rem' }}>
+                  {isLoadingTableData ? 'Loading rows from Supabase...' : `No records found in table "${selectedTable}".`}
+                </div>
+              );
+            }
+            const columns = Object.keys(rows[0]).filter((col) => !['password', 'token'].includes(col));
+
+            return (
+              <table className="owner-table" style={{ margin: 0, fontSize: '0.74rem' }}>
+                <thead style={{ position: 'sticky', top: 0, background: '#F8FAFC', zIndex: 1 }}>
+                  <tr>
+                    {columns.map((col) => (
+                      <th key={col} style={{ padding: '8px 12px', textTransform: 'uppercase', fontSize: '0.68rem', whiteSpace: 'nowrap' }}>
+                        {col.replace(/_/g, ' ')}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row: any, idx: number) => (
+                    <tr key={row.id || idx}>
+                      {columns.map((col) => {
+                        const val = row[col];
+                        const displayVal =
+                          val === null || val === undefined
+                            ? '-'
+                            : typeof val === 'object'
+                            ? JSON.stringify(val)
+                            : typeof val === 'boolean'
+                            ? val ? 'true' : 'false'
+                            : String(val);
+
+                        return (
+                          <td
+                            key={col}
+                            style={{
+                              padding: '8px 12px',
+                              maxWidth: '240px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              fontFamily: col.includes('id') || col.includes('plate') || col.includes('number') || col.includes('price') || col.includes('weight') ? 'monospace' : 'inherit',
+                              fontWeight: col.includes('name') || col.includes('number') || col.includes('plate') ? 600 : 400,
+                            }}
+                            title={displayVal}
+                          >
+                            {displayVal}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            );
+          })()}
+        </div>
+      </div>
     </div>
   );
 };
 
-const SQL_SCHEMA_STRING = `-- ==============================================================================
--- STONECRUSHER ERP - SUPABASE POSTGRESQL SCHEMA
--- Revised User Roles & WhatsApp Communication System
--- ==============================================================================
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- 1. INTERNAL ROLES & USERS (Internal only: Owner, Office Operator, Site Operator)
-CREATE TYPE internal_role AS ENUM ('OWNER_ADMIN', 'OFFICE_OPERATOR', 'SITE_OPERATOR');
-
-CREATE TABLE IF NOT EXISTS staff_users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    full_name VARCHAR(255) NOT NULL,
-    phone VARCHAR(20),
-    role internal_role NOT NULL DEFAULT 'SITE_OPERATOR',
-    is_active BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- 2. MASTER DIRECTORIES
-CREATE TABLE IF NOT EXISTS customers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL,
-    company_name VARCHAR(255) NOT NULL,
-    phone VARCHAR(20) NOT NULL,
-    email VARCHAR(255),
-    gst_number VARCHAR(50),
-    billing_address TEXT NOT NULL,
-    current_balance NUMERIC(12, 2) DEFAULT 0.00,
-    credit_limit NUMERIC(12, 2) DEFAULT 100000.00,
-    is_active BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS drivers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL,
-    phone VARCHAR(20) NOT NULL,
-    license_number VARCHAR(100) NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS vehicles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    plate_number VARCHAR(50) UNIQUE NOT NULL,
-    vehicle_type VARCHAR(50) DEFAULT 'Tipper 10-Wheeler',
-    default_tare_weight_mt NUMERIC(8, 2) DEFAULT 10.50,
-    max_capacity_mt NUMERIC(8, 2) DEFAULT 25.00,
-    assigned_driver_id UUID REFERENCES drivers(id) ON DELETE SET NULL,
-    is_active BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS products (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(100) NOT NULL,
-    code VARCHAR(50) UNIQUE NOT NULL,
-    unit VARCHAR(20) NOT NULL DEFAULT 'MT',
-    current_stock_mt NUMERIC(12, 2) NOT NULL DEFAULT 500.00,
-    min_threshold_mt NUMERIC(12, 2) NOT NULL DEFAULT 100.00,
-    unit_price_inr NUMERIC(10, 2) NOT NULL DEFAULT 650.00,
-    description TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS raw_materials (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(100) NOT NULL,
-    code VARCHAR(50) UNIQUE NOT NULL,
-    unit VARCHAR(20) NOT NULL DEFAULT 'Brass',
-    current_stock_brass NUMERIC(12, 2) NOT NULL DEFAULT 250.00,
-    min_threshold_brass NUMERIC(12, 2) NOT NULL DEFAULT 50.00,
-    unit_rate_inr NUMERIC(10, 2) NOT NULL DEFAULT 2800.00,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS suppliers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL,
-    contact_person VARCHAR(255),
-    phone VARCHAR(20) NOT NULL,
-    supplier_type VARCHAR(50) DEFAULT 'Quarry Raw Material',
-    balance_payable NUMERIC(12, 2) DEFAULT 0.00,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS spare_parts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL,
-    part_number VARCHAR(100),
-    category VARCHAR(100) DEFAULT 'Crusher Mechanical',
-    current_stock INT NOT NULL DEFAULT 2,
-    min_threshold INT NOT NULL DEFAULT 1,
-    unit_cost_inr NUMERIC(10, 2) NOT NULL DEFAULT 15000.00,
-    storage_bin VARCHAR(50) DEFAULT 'Main Shed - Rack B',
-    last_replaced_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- 3. TRIPS & FIFO DISPATCH QUEUE
-CREATE TYPE trip_status AS ENUM (
-    'QUEUED',
-    'CALLED_TO_SCALE',
-    'TARE_WEIGHED',
-    'LOADING',
-    'GROSS_WEIGHED',
-    'GATE_PASS_ISSUED',
-    'DISPATCHED',
-    'CANCELLED'
-);
-
-CREATE TABLE IF NOT EXISTS trips (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    trip_number VARCHAR(50) UNIQUE NOT NULL,
-    customer_id UUID NOT NULL REFERENCES customers(id),
-    product_id UUID NOT NULL REFERENCES products(id),
-    ordered_qty_mt NUMERIC(8, 2) NOT NULL,
-    vehicle_id UUID NOT NULL REFERENCES vehicles(id),
-    driver_id UUID NOT NULL REFERENCES drivers(id),
-    destination VARCHAR(255) NOT NULL,
-    status trip_status NOT NULL DEFAULT 'QUEUED',
-    fifo_sequence INT NOT NULL DEFAULT 1,
-    created_by UUID REFERENCES staff_users(id),
-    tare_weight_mt NUMERIC(8, 2),
-    gross_weight_mt NUMERIC(8, 2),
-    net_weight_mt NUMERIC(8, 2),
-    notes TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    dispatched_at TIMESTAMPTZ,
-    completed_at TIMESTAMPTZ
-);
-
-CREATE INDEX IF NOT EXISTS idx_trips_fifo ON trips(status, fifo_sequence ASC, created_at ASC);
-
--- 4. WEIGHBRIDGE TRANSACTIONS
-CREATE TABLE IF NOT EXISTS weighbridge_transactions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    slip_number VARCHAR(50) UNIQUE NOT NULL,
-    trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
-    vehicle_plate VARCHAR(50) NOT NULL,
-    tare_weight_mt NUMERIC(8, 2) NOT NULL,
-    tare_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    gross_weight_mt NUMERIC(8, 2),
-    gross_timestamp TIMESTAMPTZ,
-    net_weight_mt NUMERIC(8, 2),
-    operator_id UUID REFERENCES staff_users(id),
-    is_verified BOOLEAN NOT NULL DEFAULT false,
-    inventory_deducted BOOLEAN NOT NULL DEFAULT false,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- 5. GATE PASSES
-CREATE TABLE IF NOT EXISTS gate_passes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    gate_pass_number VARCHAR(50) UNIQUE NOT NULL,
-    trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
-    weighbridge_id UUID REFERENCES weighbridge_transactions(id),
-    customer_name VARCHAR(255) NOT NULL,
-    vehicle_plate VARCHAR(50) NOT NULL,
-    driver_name VARCHAR(255) NOT NULL,
-    product_name VARCHAR(100) NOT NULL,
-    net_weight_mt NUMERIC(8, 2) NOT NULL,
-    destination VARCHAR(255) NOT NULL,
-    qr_code_payload TEXT,
-    pdf_url TEXT,
-    issued_by UUID REFERENCES staff_users(id),
-    issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- 6. RAW MATERIAL INWARD RECEIPTS
-CREATE TABLE IF NOT EXISTS raw_material_receipts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    receipt_number VARCHAR(50) UNIQUE NOT NULL,
-    supplier_id UUID NOT NULL REFERENCES suppliers(id),
-    raw_material_id UUID NOT NULL REFERENCES raw_materials(id),
-    vehicle_number VARCHAR(50) NOT NULL,
-    quantity_brass NUMERIC(8, 2) NOT NULL,
-    rate_per_brass NUMERIC(10, 2) NOT NULL,
-    total_amount NUMERIC(12, 2) NOT NULL,
-    inward_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    received_by UUID REFERENCES staff_users(id),
-    pdf_url TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- 7. WHATSAPP DELIVERY TRACKING
-CREATE TYPE whatsapp_recipient_type AS ENUM ('CUSTOMER', 'DRIVER', 'SUPPLIER', 'OWNER');
-CREATE TYPE whatsapp_message_status AS ENUM ('PENDING', 'SENT', 'DELIVERED', 'READ', 'FAILED');
-
-CREATE TABLE IF NOT EXISTS whatsapp_messages (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    recipient_phone VARCHAR(25) NOT NULL,
-    recipient_type whatsapp_recipient_type NOT NULL,
-    recipient_name VARCHAR(255),
-    message_type VARCHAR(50) NOT NULL,
-    template_name VARCHAR(100) NOT NULL,
-    message_body TEXT NOT NULL,
-    document_url TEXT,
-    document_filename VARCHAR(255),
-    related_entity VARCHAR(50),
-    related_entity_id VARCHAR(100),
-    status whatsapp_message_status NOT NULL DEFAULT 'PENDING',
-    provider_message_id VARCHAR(100),
-    retry_count INT NOT NULL DEFAULT 0,
-    failure_reason TEXT,
-    sent_at TIMESTAMPTZ,
-    delivered_at TIMESTAMPTZ,
-    read_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- 8. AUTOMATIC INVENTORY DEDUCTION TRIGGER
-CREATE OR REPLACE FUNCTION trigger_deduct_inventory_on_weighbridge()
-RETURNS TRIGGER AS $$
-DECLARE
-    v_product_id UUID;
-    v_net_weight NUMERIC(8, 2);
-BEGIN
-    IF NEW.gross_weight_mt IS NOT NULL AND NEW.is_verified = true AND (OLD.inventory_deducted IS DISTINCT FROM true) THEN
-        v_net_weight := NEW.gross_weight_mt - NEW.tare_weight_mt;
-        NEW.net_weight_mt := v_net_weight;
-
-        SELECT product_id INTO v_product_id FROM trips WHERE id = NEW.trip_id;
-
-        IF v_product_id IS NOT NULL THEN
-            UPDATE products 
-            SET current_stock_mt = GREATEST(0, current_stock_mt - v_net_weight),
-                updated_at = NOW()
-            WHERE id = v_product_id;
-
-            NEW.inventory_deducted := true;
-        END IF;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_weighbridge_inventory_deduct ON weighbridge_transactions;
-CREATE TRIGGER trg_weighbridge_inventory_deduct
-BEFORE UPDATE OR INSERT ON weighbridge_transactions
-FOR EACH ROW
-EXECUTE FUNCTION trigger_deduct_inventory_on_weighbridge();
-
--- 9. AUDIT LOGS
-CREATE TABLE IF NOT EXISTS audit_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_name VARCHAR(255) NOT NULL DEFAULT 'System',
-    user_role VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
-    action VARCHAR(100) NOT NULL,
-    entity VARCHAR(50) NOT NULL,
-    entity_id VARCHAR(100),
-    details JSONB,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-`;
-
-const SQL_SEED_STRING = `-- STONECRUSHER INITIAL SEEDS
-INSERT INTO staff_users (id, email, full_name, phone, role) VALUES
-('11111111-1111-1111-1111-111111111111', 'owner@stonecrusher.com', 'Vikramaditya Shinde', '+919822011223', 'OWNER_ADMIN'),
-('22222222-2222-2222-2222-222222222222', 'office@stonecrusher.com', 'Amit Patil', '+919822033445', 'OFFICE_OPERATOR'),
-('33333333-3333-3333-3333-333333333333', 'site@stonecrusher.com', 'Suresh Gaikwad', '+919822055667', 'SITE_OPERATOR')
-ON CONFLICT DO NOTHING;
-
-INSERT INTO products (name, code, unit, current_stock_mt, min_threshold_mt, unit_price_inr) VALUES
-('20mm Aggregate', 'AGG-20MM', 'MT', 480.00, 100.00, 680.00),
-('10mm Aggregate', 'AGG-10MM', 'MT', 320.00, 80.00, 720.00),
-('40mm Aggregate', 'AGG-40MM', 'MT', 210.00, 60.00, 610.00),
-('GSB (Granular Sub Base)', 'GSB-MIX', 'MT', 650.00, 120.00, 480.00),
-('Crusher Dust', 'CR-DUST', 'MT', 410.00, 90.00, 390.00),
-('M-Sand (Manufactured)', 'M-SAND', 'MT', 75.00, 100.00, 850.00)
-ON CONFLICT DO NOTHING;
-`;

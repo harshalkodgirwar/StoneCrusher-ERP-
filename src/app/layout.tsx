@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import './owner/owner-dashboard.css';
 
 export const metadata: Metadata = {
   title: 'StoneCrusher ERP | Industrial Production & Weighbridge Control',

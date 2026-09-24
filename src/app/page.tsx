@@ -110,7 +110,7 @@ export default function HomePage() {
                   Office Operator
                 </h3>
                 <p style={{ color: '#9CA3AF', fontSize: '0.8rem', marginTop: '6px', lineHeight: 1.45 }}>
-                  Book customer orders, assign vehicles & drivers, and automatically push trips into the Site Operator's FIFO dispatch queue.
+                  Book customer orders with required delivery dates, automatically scheduled into the Site Operator's delivery queue.
                 </p>
               </div>
 
@@ -155,7 +155,7 @@ export default function HomePage() {
                   Site Operator
                 </h3>
                 <p style={{ color: '#9CA3AF', fontSize: '0.8rem', marginTop: '6px', lineHeight: 1.45 }}>
-                  Day-to-day crusher site flow: FIFO queue, digital weighbridge tare & gross, automatic inventory deduction, and gate passes.
+                  Day-to-day crusher site flow: Delivery date queue, truck & driver assignment, digital weighbridge tare & gross, and gate passes.
                 </p>
               </div>
 
