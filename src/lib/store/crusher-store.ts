@@ -95,6 +95,7 @@ export interface Trip {
   tareWeightMt?: number;
   grossWeightMt?: number;
   netWeightMt?: number;
+  unitPriceInr?: number;
   notes?: string;
   createdAt: string;
   dispatchedAt?: string;
@@ -158,6 +159,84 @@ export interface AuditLog {
   details: string;
   createdAt: string;
 }
+
+export type PaymentMode = 'NEFT_RTGS' | 'UPI' | 'CHEQUE' | 'CASH' | 'NET_BANKING';
+
+export interface CustomerPayment {
+  id: string;
+  paymentNumber: string;
+  customerId: string;
+  amount: number;
+  paymentDate: string;
+  paymentMode: PaymentMode;
+  referenceNumber?: string;
+  notes?: string;
+  receivedBy?: string;
+  createdAt: string;
+}
+
+const SEED_CUSTOMER_PAYMENTS: CustomerPayment[] = [
+  {
+    id: 'pay-001',
+    paymentNumber: 'RCPT-2026-000101',
+    customerId: 'c001',
+    amount: 40000,
+    paymentDate: new Date(Date.now() - 86400000 * 10).toISOString().split('T')[0],
+    paymentMode: 'NEFT_RTGS',
+    referenceNumber: 'HDFC2026091288',
+    notes: 'Advance booking deposit for 20mm aggregate supply',
+    receivedBy: 'Vikramaditya Shinde',
+    createdAt: new Date(Date.now() - 86400000 * 10).toISOString(),
+  },
+  {
+    id: 'pay-002',
+    paymentNumber: 'RCPT-2026-000102',
+    customerId: 'c001',
+    amount: 25427,
+    paymentDate: new Date(Date.now() - 86400000 * 3).toISOString().split('T')[0],
+    paymentMode: 'CHEQUE',
+    referenceNumber: 'CHQ-409121 (SBI)',
+    notes: 'Part settlement for Hinjawadi site dispatches',
+    receivedBy: 'Vikramaditya Shinde',
+    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+  },
+  {
+    id: 'pay-003',
+    paymentNumber: 'RCPT-2026-000103',
+    customerId: 'c002',
+    amount: 30000,
+    paymentDate: new Date(Date.now() - 86400000 * 12).toISOString().split('T')[0],
+    paymentMode: 'NEFT_RTGS',
+    referenceNumber: 'ICIC99281720',
+    notes: 'RTGS transfer for Kharadi bypass project',
+    receivedBy: 'Vikramaditya Shinde',
+    createdAt: new Date(Date.now() - 86400000 * 12).toISOString(),
+  },
+  {
+    id: 'pay-004',
+    paymentNumber: 'RCPT-2026-000104',
+    customerId: 'c002',
+    amount: 15000,
+    paymentDate: new Date(Date.now() - 86400000 * 5).toISOString().split('T')[0],
+    paymentMode: 'UPI',
+    referenceNumber: 'UPI-9812739182',
+    notes: 'Immediate payment against dispatch TRP-2',
+    receivedBy: 'Site Office Weighbridge',
+    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+  },
+  {
+    id: 'pay-005',
+    paymentNumber: 'RCPT-2026-000105',
+    customerId: 'c003',
+    amount: 56910,
+    paymentDate: new Date(Date.now() - 86400000 * 2).toISOString().split('T')[0],
+    paymentMode: 'NEFT_RTGS',
+    referenceNumber: 'KKBK19283741',
+    notes: 'Full invoice settlement for Pune-Bangalore Expressway work',
+    receivedBy: 'Vikramaditya Shinde',
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+  },
+];
 
 // Initial default seed states
 const SEED_CUSTOMERS: Customer[] = [
@@ -400,7 +479,7 @@ const SEED_TRIPS: Trip[] = [
     requiredDate: new Date().toISOString().split('T')[0],
     status: 'QUEUED',
     fifoSequence: 1,
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
+    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
     notes: 'Priority concrete batching plant pour at 5 PM',
   },
   {
@@ -415,8 +494,217 @@ const SEED_TRIPS: Trip[] = [
     requiredDate: new Date().toISOString().split('T')[0],
     status: 'QUEUED',
     fifoSequence: 2,
-    createdAt: new Date(Date.now() - 1800000).toISOString(),
+    createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
     notes: 'Slab casting material',
+  },
+  {
+    id: 't003',
+    tripNumber: 'TRP-2026-000003',
+    customerId: 'c001',
+    productId: 'p002',
+    orderedQtyMt: 25.4,
+    vehicleId: 'v001',
+    driverId: 'd001',
+    destination: 'Plot 42, MIDC Hinjawadi Phase 2, Pune',
+    status: 'COMPLETED',
+    fifoSequence: 3,
+    tareWeightMt: 10.2,
+    grossWeightMt: 35.6,
+    netWeightMt: 25.4,
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    dispatchedAt: new Date(Date.now() - 86400000 * 2 + 1800000).toISOString(),
+    completedAt: new Date(Date.now() - 86400000 * 2 + 7200000).toISOString(),
+    notes: '10mm aggregate for RMC mix',
+  },
+  {
+    id: 't004',
+    tripNumber: 'TRP-2026-000004',
+    customerId: 'c001',
+    productId: 'p006',
+    orderedQtyMt: 30.2,
+    vehicleId: 'v002',
+    driverId: 'd002',
+    destination: 'Plot 42, MIDC Hinjawadi Phase 2, Pune',
+    status: 'COMPLETED',
+    fifoSequence: 4,
+    tareWeightMt: 12.8,
+    grossWeightMt: 43.0,
+    netWeightMt: 30.2,
+    createdAt: new Date(Date.now() - 86400000 * 4).toISOString(),
+    dispatchedAt: new Date(Date.now() - 86400000 * 4 + 1800000).toISOString(),
+    completedAt: new Date(Date.now() - 86400000 * 4 + 7200000).toISOString(),
+    notes: 'M-Sand plastering grade',
+  },
+  {
+    id: 't005',
+    tripNumber: 'TRP-2026-000005',
+    customerId: 'c001',
+    productId: 'p004',
+    orderedQtyMt: 24.5,
+    vehicleId: 'v001',
+    driverId: 'd001',
+    destination: 'Plot 42, MIDC Hinjawadi Phase 2, Pune',
+    status: 'COMPLETED',
+    fifoSequence: 5,
+    tareWeightMt: 10.4,
+    grossWeightMt: 34.9,
+    netWeightMt: 24.5,
+    createdAt: new Date(Date.now() - 86400000 * 6).toISOString(),
+    dispatchedAt: new Date(Date.now() - 86400000 * 6 + 1800000).toISOString(),
+    completedAt: new Date(Date.now() - 86400000 * 6 + 7200000).toISOString(),
+    notes: 'Sub-base road filling',
+  },
+  {
+    id: 't006',
+    tripNumber: 'TRP-2026-000006',
+    customerId: 'c001',
+    productId: 'p001',
+    orderedQtyMt: 28.0,
+    vehicleId: 'v003',
+    driverId: 'd003',
+    destination: 'Plot 42, MIDC Hinjawadi Phase 2, Pune',
+    status: 'COMPLETED',
+    fifoSequence: 6,
+    tareWeightMt: 6.2,
+    grossWeightMt: 34.2,
+    netWeightMt: 28.0,
+    createdAt: new Date(Date.now() - 86400000 * 8).toISOString(),
+    dispatchedAt: new Date(Date.now() - 86400000 * 8 + 1800000).toISOString(),
+    completedAt: new Date(Date.now() - 86400000 * 8 + 7200000).toISOString(),
+    notes: '20mm structural aggregate',
+  },
+  {
+    id: 't007',
+    tripNumber: 'TRP-2026-000007',
+    customerId: 'c001',
+    productId: 'p003',
+    orderedQtyMt: 34.0,
+    vehicleId: 'v002',
+    driverId: 'd002',
+    destination: 'Plot 42, MIDC Hinjawadi Phase 2, Pune',
+    status: 'COMPLETED',
+    fifoSequence: 7,
+    tareWeightMt: 12.8,
+    grossWeightMt: 46.8,
+    netWeightMt: 34.0,
+    createdAt: new Date(Date.now() - 86400000 * 11).toISOString(),
+    dispatchedAt: new Date(Date.now() - 86400000 * 11 + 1800000).toISOString(),
+    completedAt: new Date(Date.now() - 86400000 * 11 + 7200000).toISOString(),
+    notes: '40mm road metal foundation base',
+  },
+  {
+    id: 't008',
+    tripNumber: 'TRP-2026-000008',
+    customerId: 'c002',
+    productId: 'p001',
+    orderedQtyMt: 38.0,
+    vehicleId: 'v001',
+    driverId: 'd001',
+    destination: 'Sector 18, Kharadi Bypass, Pune',
+    status: 'COMPLETED',
+    fifoSequence: 8,
+    tareWeightMt: 10.4,
+    grossWeightMt: 48.4,
+    netWeightMt: 38.0,
+    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+    dispatchedAt: new Date(Date.now() - 86400000 * 3 + 1800000).toISOString(),
+    completedAt: new Date(Date.now() - 86400000 * 3 + 7200000).toISOString(),
+    notes: 'Basalt aggregate delivery',
+  },
+  {
+    id: 't009',
+    tripNumber: 'TRP-2026-000009',
+    customerId: 'c002',
+    productId: 'p006',
+    orderedQtyMt: 35.0,
+    vehicleId: 'v002',
+    driverId: 'd002',
+    destination: 'Sector 18, Kharadi Bypass, Pune',
+    status: 'COMPLETED',
+    fifoSequence: 9,
+    tareWeightMt: 12.8,
+    grossWeightMt: 47.8,
+    netWeightMt: 35.0,
+    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+    dispatchedAt: new Date(Date.now() - 86400000 * 5 + 1800000).toISOString(),
+    completedAt: new Date(Date.now() - 86400000 * 5 + 7200000).toISOString(),
+    notes: 'M-Sand plaster material',
+  },
+  {
+    id: 't010',
+    tripNumber: 'TRP-2026-000010',
+    customerId: 'c002',
+    productId: 'p005',
+    orderedQtyMt: 42.0,
+    vehicleId: 'v003',
+    driverId: 'd003',
+    destination: 'Sector 18, Kharadi Bypass, Pune',
+    status: 'COMPLETED',
+    fifoSequence: 10,
+    tareWeightMt: 6.2,
+    grossWeightMt: 48.2,
+    netWeightMt: 42.0,
+    createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
+    dispatchedAt: new Date(Date.now() - 86400000 * 7 + 1800000).toISOString(),
+    completedAt: new Date(Date.now() - 86400000 * 7 + 7200000).toISOString(),
+    notes: 'Crusher dust for pavement base',
+  },
+  {
+    id: 't011',
+    tripNumber: 'TRP-2026-000011',
+    customerId: 'c002',
+    productId: 'p004',
+    orderedQtyMt: 48.0,
+    vehicleId: 'v001',
+    driverId: 'd001',
+    destination: 'Sector 18, Kharadi Bypass, Pune',
+    status: 'COMPLETED',
+    fifoSequence: 11,
+    tareWeightMt: 10.4,
+    grossWeightMt: 58.4,
+    netWeightMt: 48.0,
+    createdAt: new Date(Date.now() - 86400000 * 9).toISOString(),
+    dispatchedAt: new Date(Date.now() - 86400000 * 9 + 1800000).toISOString(),
+    completedAt: new Date(Date.now() - 86400000 * 9 + 7200000).toISOString(),
+    notes: 'Sub base grading',
+  },
+  {
+    id: 't012',
+    tripNumber: 'TRP-2026-000012',
+    customerId: 'c003',
+    productId: 'p004',
+    orderedQtyMt: 60.0,
+    vehicleId: 'v002',
+    driverId: 'd002',
+    destination: 'Survey 104, Pune-Bangalore Expressway',
+    status: 'COMPLETED',
+    fifoSequence: 12,
+    tareWeightMt: 12.8,
+    grossWeightMt: 72.8,
+    netWeightMt: 60.0,
+    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+    dispatchedAt: new Date(Date.now() - 86400000 * 3 + 1800000).toISOString(),
+    completedAt: new Date(Date.now() - 86400000 * 3 + 7200000).toISOString(),
+    notes: 'Expressway corridor filling',
+  },
+  {
+    id: 't013',
+    tripNumber: 'TRP-2026-000013',
+    customerId: 'c003',
+    productId: 'p003',
+    orderedQtyMt: 50.0,
+    vehicleId: 'v001',
+    driverId: 'd001',
+    destination: 'Survey 104, Pune-Bangalore Expressway',
+    status: 'COMPLETED',
+    fifoSequence: 13,
+    tareWeightMt: 10.4,
+    grossWeightMt: 60.4,
+    netWeightMt: 50.0,
+    createdAt: new Date(Date.now() - 86400000 * 6).toISOString(),
+    dispatchedAt: new Date(Date.now() - 86400000 * 6 + 1800000).toISOString(),
+    completedAt: new Date(Date.now() - 86400000 * 6 + 7200000).toISOString(),
+    notes: '40mm metal road pitching',
   },
 ];
 
@@ -479,6 +767,7 @@ export interface CrusherStoreState {
   suppliers: Supplier[];
   spareParts: SparePart[];
   trips: Trip[];
+  customerPayments: CustomerPayment[];
   weighbridgeTransactions: WeighbridgeTransaction[];
   gatePasses: GatePass[];
   rawMaterialReceipts: RawMaterialReceipt[];
@@ -495,7 +784,8 @@ type Listener = () => void;
 class CrusherStore {
   private state: CrusherStoreState;
   private listeners: Set<Listener> = new Set();
-  private tripCounter = 3;
+  private tripCounter = 14;
+  private paymentCounter = 6;
   private weighbridgeCounter = 1;
   private gatePassCounter = 1;
   private rawReceiptCounter = 1;
@@ -519,6 +809,7 @@ class CrusherStore {
       suppliers: SEED_SUPPLIERS,
       spareParts: SEED_SPARE_PARTS,
       trips: SEED_TRIPS,
+      customerPayments: SEED_CUSTOMER_PAYMENTS,
       weighbridgeTransactions: [],
       gatePasses: [],
       rawMaterialReceipts: SEED_RAW_MATERIAL_RECEIPTS,
@@ -594,7 +885,8 @@ class CrusherStore {
         if (parsed && typeof parsed === 'object') {
           this.state = {
             ...this.state,
-            trips: Array.isArray(parsed.trips) && parsed.trips.length > 0 ? parsed.trips : this.state.trips,
+            trips: Array.isArray(parsed.trips) && parsed.trips.length > 2 ? parsed.trips : this.state.trips,
+            customerPayments: Array.isArray(parsed.customerPayments) && parsed.customerPayments.length > 0 ? parsed.customerPayments : this.state.customerPayments,
             weighbridgeTransactions: Array.isArray(parsed.weighbridgeTransactions) ? parsed.weighbridgeTransactions : this.state.weighbridgeTransactions,
             gatePasses: Array.isArray(parsed.gatePasses) ? parsed.gatePasses : this.state.gatePasses,
             rawMaterialReceipts: Array.isArray(parsed.rawMaterialReceipts) ? parsed.rawMaterialReceipts : this.state.rawMaterialReceipts,
@@ -606,6 +898,7 @@ class CrusherStore {
             whatsappMessages: Array.isArray(parsed.whatsappMessages) ? parsed.whatsappMessages : this.state.whatsappMessages,
             deletedMasterIds: Array.isArray(parsed.deletedMasterIds) ? parsed.deletedMasterIds : (this.state.deletedMasterIds || []),
           };
+          this.recalculateAllCustomerBalances();
           this.notify();
         }
       }
@@ -654,6 +947,7 @@ class CrusherStore {
     try {
       const payload = {
         trips: this.state.trips,
+        customerPayments: this.state.customerPayments,
         weighbridgeTransactions: this.state.weighbridgeTransactions,
         gatePasses: this.state.gatePasses,
         rawMaterialReceipts: this.state.rawMaterialReceipts,
@@ -829,6 +1123,7 @@ class CrusherStore {
       };
 
       this.persistAndBroadcast();
+      this.recalculateAllCustomerBalances();
       this.notify();
       return true;
     } catch (err) {
@@ -1071,6 +1366,7 @@ class CrusherStore {
 
     // 1. Core ERP Transaction (Always succeeds)
     this.state.trips = [...this.state.trips, newTrip];
+    this.syncCustomerBalance(params.customerId);
     this.addAuditLog('CREATE_TRIP', 'TRIP', tripNumber, `Created Trip ${tripNumber} for ${params.orderedQtyMt} MT (Req: ${newTrip.requiredDate})`);
     this.persistAndBroadcast();
     this.notify();
@@ -1700,6 +1996,137 @@ class CrusherStore {
         method: 'DELETE',
       }).catch((err) => console.warn('Customer DELETE error:', err));
     }
+  }
+
+  getCustomerBalance(customerId: string): number {
+    const customerTrips = (this.state.trips || []).filter((t) => t.customerId === customerId);
+    let totalDebits = 0;
+    for (const t of customerTrips) {
+      const product = (this.state.products || []).find((p) => p.id === t.productId);
+      const qty = t.netWeightMt || t.orderedQtyMt || 20;
+      const rate = t.unitPriceInr || product?.unitPriceInr || 680;
+      const taxable = Math.round(qty * rate);
+      const gst = Math.round(taxable * 0.05);
+      totalDebits += taxable + gst;
+    }
+
+    const customerPayments = (this.state.customerPayments || []).filter((p) => p.customerId === customerId);
+    const totalCredits = customerPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+
+    if (customerTrips.length === 0 && customerPayments.length === 0) {
+      const customer = (this.state.customers || []).find((c) => c.id === customerId);
+      return customer?.currentBalance || 0;
+    }
+
+    return totalDebits - totalCredits;
+  }
+
+  syncCustomerBalance(customerId: string): number {
+    const newBalance = this.getCustomerBalance(customerId);
+    this.state.customers = (this.state.customers || []).map((c) => {
+      if (c.id === customerId) {
+        return {
+          ...c,
+          currentBalance: newBalance,
+        };
+      }
+      return c;
+    });
+
+    this.persistAndBroadcast();
+    this.notify();
+
+    // Background sync to database
+    if (typeof window !== 'undefined') {
+      fetch('/api/database/customers', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: customerId, currentBalance: newBalance }),
+      }).catch((err) => console.warn('Customer balance PATCH error:', err));
+    }
+
+    return newBalance;
+  }
+
+  recalculateAllCustomerBalances(): void {
+    let hasChanges = false;
+    this.state.customers = (this.state.customers || []).map((c) => {
+      const computed = this.getCustomerBalance(c.id);
+      if (c.currentBalance !== computed) {
+        hasChanges = true;
+        if (typeof window !== 'undefined') {
+          fetch('/api/database/customers', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: c.id, currentBalance: computed }),
+          }).catch(() => {});
+        }
+        return { ...c, currentBalance: computed };
+      }
+      return c;
+    });
+
+    if (hasChanges) {
+      this.persistAndBroadcast();
+      this.notify();
+    }
+  }
+
+  recordCustomerPayment(params: {
+    customerId: string;
+    amount: number;
+    paymentDate: string;
+    paymentMode: PaymentMode;
+    referenceNumber?: string;
+    notes?: string;
+    receivedBy?: string;
+  }): CustomerPayment {
+    this.paymentCounter++;
+    const paymentNumber = `RCPT-2026-${String(this.paymentCounter).padStart(6, '0')}`;
+    const payment: CustomerPayment = {
+      id: `pay-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      paymentNumber,
+      customerId: params.customerId,
+      amount: Number(params.amount) || 0,
+      paymentDate: params.paymentDate || new Date().toISOString().split('T')[0],
+      paymentMode: params.paymentMode || 'NEFT_RTGS',
+      referenceNumber: params.referenceNumber || '',
+      notes: params.notes || '',
+      receivedBy: params.receivedBy || this.state.currentStaffName,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.state.customerPayments = [payment, ...(this.state.customerPayments || [])];
+
+    // Automatically recalculate and sync customer balance across store, storage and DB!
+    const newBal = this.syncCustomerBalance(params.customerId);
+
+    const customer = this.state.customers.find((c) => c.id === params.customerId);
+    this.addAuditLog(
+      'PAYMENT_RECORDED',
+      'CUSTOMER_PAYMENT',
+      payment.paymentNumber,
+      `Received ₹${payment.amount.toLocaleString('en-IN')} from ${customer?.companyName || 'Customer'} via ${payment.paymentMode}. Ref: ${payment.referenceNumber || 'N/A'}. New balance: ₹${newBal.toLocaleString('en-IN')}`
+    );
+
+    return payment;
+  }
+
+  deleteCustomerPayment(id: string): void {
+    const payment = (this.state.customerPayments || []).find((p) => p.id === id);
+    if (!payment) return;
+
+    this.state.customerPayments = (this.state.customerPayments || []).filter((p) => p.id !== id);
+
+    // Automatically recalculate and sync customer balance
+    const newBal = this.syncCustomerBalance(payment.customerId);
+
+    this.addAuditLog(
+      'PAYMENT_DELETED',
+      'CUSTOMER_PAYMENT',
+      payment.paymentNumber,
+      `Deleted receipt ${payment.paymentNumber} of ₹${payment.amount.toLocaleString('en-IN')}. New balance: ₹${newBal.toLocaleString('en-IN')}`
+    );
   }
 
   updateVehicle(id: string, updates: Partial<Vehicle>): Vehicle | null {

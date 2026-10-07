@@ -44,8 +44,10 @@ import {
   Sparkles,
   Edit,
   Trash2,
+  BookOpen,
 } from 'lucide-react';
 import { DatabaseConfigView } from '../database/DatabaseConfigView';
+import { CustomerAccountBookModal } from '../documents/CustomerAccountBookModal';
 
 interface OwnerAdminDashboardProps {
   onOpenWhatsAppSimulator: () => void;
@@ -123,6 +125,7 @@ export const OwnerAdminDashboard: React.FC<OwnerAdminDashboardProps> = ({
   };
 
   // Add Master Modals state
+  const [selectedCustomerForAccountBook, setSelectedCustomerForAccountBook] = useState<Customer | null>(null);
   const [showAddCustModal, setShowAddCustModal] = useState<boolean>(false);
   const [custCompany, setCustCompany] = useState<string>('');
   const [custName, setCustName] = useState<string>('');
@@ -2013,19 +2016,80 @@ export const OwnerAdminDashboard: React.FC<OwnerAdminDashboardProps> = ({
                     <tbody>
                       {store.customers.map((c) => (
                         <tr key={c.id}>
-                          <td style={{ fontWeight: 700, color: '#0F172A' }}>{c.companyName}</td>
-                          <td style={{ fontWeight: 600 }}>{c.name}</td>
+                          <td>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCustomerForAccountBook(c)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '7px',
+                                color: '#1E40AF',
+                                fontWeight: 800,
+                                fontSize: '0.84rem',
+                              }}
+                              title="Click to view Customer Account Book & Ledger"
+                            >
+                              <BookOpen size={15} style={{ color: '#2563EB', flexShrink: 0 }} />
+                              <span style={{ textDecoration: 'underline', textDecorationColor: '#93C5FD' }}>
+                                {c.companyName}
+                              </span>
+                            </button>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCustomerForAccountBook(c)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                fontWeight: 600,
+                                color: '#334155',
+                                fontSize: '0.8rem',
+                              }}
+                              title="Click to view Customer Account Book & Ledger"
+                            >
+                              {c.name}
+                            </button>
+                          </td>
                           <td style={{ color: '#2563EB', fontSize: '0.75rem' }}>📱 {c.phone}</td>
                           <td style={{ color: '#64748B', fontSize: '0.75rem' }}>{c.gstNumber || '-'}</td>
                           <td style={{ color: '#64748B', fontSize: '0.75rem', maxWidth: '240px' }}>{c.billingAddress}</td>
-                          <td style={{ fontWeight: 800, color: c.currentBalance > 40000 ? '#DC2626' : '#16A34A' }}>
-                            ₹ {c.currentBalance.toLocaleString('en-IN')}
+                          <td style={{ fontWeight: 800, color: crusherStore.getCustomerBalance(c.id) > 40000 ? '#DC2626' : '#16A34A' }}>
+                            ₹ {crusherStore.getCustomerBalance(c.id).toLocaleString('en-IN')}
                           </td>
                           <td>
                             <span className="owner-pill-badge owner-pill-green">ACTIVE</span>
                           </td>
                           <td style={{ textAlign: 'right' }}>
                             <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                              <button
+                                onClick={() => setSelectedCustomerForAccountBook(c)}
+                                style={{
+                                  background: '#ECFDF5',
+                                  color: '#059669',
+                                  border: '1px solid #A7F3D0',
+                                  padding: '4px 8px',
+                                  borderRadius: '5px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                }}
+                                title="Open Customer Account Book & Ledger"
+                              >
+                                <BookOpen size={12} /> Account Book
+                              </button>
                               <button
                                 onClick={() => setEditingCustomer(c)}
                                 style={{
@@ -2653,7 +2717,7 @@ export const OwnerAdminDashboard: React.FC<OwnerAdminDashboardProps> = ({
                 <div className="owner-card" style={{ padding: '14px 18px', background: '#FFFFFF' }}>
                   <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Outstanding Receivables</div>
                   <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#DC2626', marginTop: '4px' }}>
-                    ₹ {store.customers.reduce((acc, c) => acc + c.currentBalance, 0).toLocaleString('en-IN')}
+                    ₹ {store.customers.reduce((acc, c) => acc + crusherStore.getCustomerBalance(c.id), 0).toLocaleString('en-IN')}
                   </div>
                   <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '4px' }}>Across Active Clients</div>
                 </div>
@@ -2838,16 +2902,41 @@ export const OwnerAdminDashboard: React.FC<OwnerAdminDashboardProps> = ({
                   </thead>
                   <tbody>
                     {store.customers.map((c) => {
-                      const hasWarning = c.currentBalance > 40000;
+                      const balance = crusherStore.getCustomerBalance(c.id);
+                      const hasWarning = balance > 40000;
                       return (
                         <tr key={c.id}>
-                          <td style={{ fontWeight: 700, color: '#0F172A' }}>{c.companyName}</td>
+                          <td>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCustomerForAccountBook(c)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                color: '#1E40AF',
+                                fontWeight: 800,
+                                fontSize: '0.84rem',
+                              }}
+                              title="Click to view Customer Account Book & Ledger"
+                            >
+                              <BookOpen size={14} style={{ color: '#2563EB', flexShrink: 0 }} />
+                              <span style={{ textDecoration: 'underline', textDecorationColor: '#93C5FD' }}>
+                                {c.companyName}
+                              </span>
+                            </button>
+                          </td>
                           <td style={{ fontWeight: 600 }}>{c.name}</td>
                           <td style={{ color: '#2563EB', fontSize: '0.75rem' }}>📱 {c.phone}</td>
                           <td style={{ color: '#64748B', fontSize: '0.75rem' }}>{c.gstNumber || '-'}</td>
                           <td style={{ color: '#64748B', fontSize: '0.75rem', maxWidth: '200px' }}>{c.billingAddress}</td>
                           <td style={{ fontWeight: 800, color: hasWarning ? '#DC2626' : '#16A34A', fontSize: '0.85rem' }}>
-                            ₹ {c.currentBalance.toLocaleString('en-IN')}
+                            ₹ {balance.toLocaleString('en-IN')}
                           </td>
                           <td>
                             {hasWarning ? (
@@ -2857,21 +2946,42 @@ export const OwnerAdminDashboard: React.FC<OwnerAdminDashboardProps> = ({
                             )}
                           </td>
                           <td>
-                            <button
-                              onClick={onOpenWhatsAppSimulator}
-                              style={{
-                                background: '#F1F5F9',
-                                border: '1px solid #CBD5E1',
-                                color: '#2563EB',
-                                padding: '3px 8px',
-                                borderRadius: '4px',
-                                fontSize: '0.72rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                              }}
-                            >
-                              Send Statement
-                            </button>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button
+                                onClick={() => setSelectedCustomerForAccountBook(c)}
+                                style={{
+                                  background: '#EFF6FF',
+                                  border: '1px solid #BFDBFE',
+                                  color: '#2563EB',
+                                  padding: '3px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                }}
+                                title="Open Total Account Book"
+                              >
+                                <BookOpen size={12} /> View Book
+                              </button>
+                              <button
+                                onClick={onOpenWhatsAppSimulator}
+                                style={{
+                                  background: '#F1F5F9',
+                                  border: '1px solid #CBD5E1',
+                                  color: '#475569',
+                                  padding: '3px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Send Statement
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -4454,6 +4564,15 @@ export const OwnerAdminDashboard: React.FC<OwnerAdminDashboardProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Customer Total Account Book & Ledger Modal */}
+      {selectedCustomerForAccountBook && (
+        <CustomerAccountBookModal
+          customer={selectedCustomerForAccountBook}
+          onClose={() => setSelectedCustomerForAccountBook(null)}
+          onOpenGatePass={onViewGatePass}
+        />
       )}
     </div>
   );

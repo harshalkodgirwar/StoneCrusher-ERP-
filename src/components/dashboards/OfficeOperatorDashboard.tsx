@@ -24,7 +24,10 @@ import {
   MapPin,
   ExternalLink,
   ChevronRight,
+  BookOpen,
 } from 'lucide-react';
+import { Customer } from '../../lib/store/crusher-store';
+import { CustomerAccountBookModal } from '../documents/CustomerAccountBookModal';
 
 interface OfficeOperatorDashboardProps {
   onOpenWhatsAppSimulator: () => void;
@@ -39,6 +42,7 @@ export const OfficeOperatorDashboard: React.FC<OfficeOperatorDashboardProps> = (
 }) => {
   const store = useCrusherStore();
   const [activeTab, setActiveTab] = useState<OfficeNavTab>('NEW_ORDER');
+  const [selectedCustomerForAccountBook, setSelectedCustomerForAccountBook] = useState<Customer | null>(null);
 
   // Form state
   const [customerId, setCustomerId] = useState(store.customers[0]?.id || '');
@@ -641,10 +645,15 @@ export const OfficeOperatorDashboard: React.FC<OfficeOperatorDashboardProps> = (
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ color: '#64748B' }}>Customer Credit Balance:</span>
-                        <strong style={{ color: selectedCustomer.currentBalance >= 0 ? '#15803D' : '#DC2626' }}>
-                          ₹{Math.abs(selectedCustomer.currentBalance).toLocaleString()}{' '}
-                          {selectedCustomer.currentBalance >= 0 ? 'Cr (Advance)' : 'Dr (Outstanding)'}
-                        </strong>
+                        {(() => {
+                          const bal = crusherStore.getCustomerBalance(selectedCustomer.id);
+                          return (
+                            <strong style={{ color: bal <= 0 ? '#15803D' : '#DC2626' }}>
+                              ₹{Math.abs(bal).toLocaleString()}{' '}
+                              {bal < 0 ? 'Cr (Advance)' : bal > 0 ? 'Dr (Due)' : '(Settled)'}
+                            </strong>
+                          );
+                        })()}
                       </div>
                       <div style={{ color: '#64748B', marginTop: '4px', fontSize: '0.7rem' }}>
                         Auto-receipt will be sent to <strong>{selectedCustomer.phone}</strong>
@@ -1011,10 +1020,50 @@ export const OfficeOperatorDashboard: React.FC<OfficeOperatorDashboardProps> = (
                             <div className="owner-cust-avatar">
                               {c.companyName.slice(0, 2).toUpperCase()}
                             </div>
-                            <strong style={{ color: '#0F172A' }}>{c.companyName}</strong>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCustomerForAccountBook(c)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                fontWeight: 800,
+                                color: '#1E40AF',
+                                fontSize: '0.84rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                              }}
+                              title="Click to view Customer Account Book & Ledger"
+                            >
+                              <BookOpen size={14} style={{ color: '#2563EB', flexShrink: 0 }} />
+                              <span style={{ textDecoration: 'underline', textDecorationColor: '#93C5FD' }}>
+                                {c.companyName}
+                              </span>
+                            </button>
                           </div>
                         </td>
-                        <td>{c.name}</td>
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCustomerForAccountBook(c)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              fontWeight: 600,
+                              color: '#334155',
+                              fontSize: '0.8rem',
+                            }}
+                            title="Click to view Customer Account Book"
+                          >
+                            {c.name}
+                          </button>
+                        </td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ color: '#25D366' }}>●</span>
@@ -1023,22 +1072,48 @@ export const OfficeOperatorDashboard: React.FC<OfficeOperatorDashboardProps> = (
                         </td>
                         <td style={{ color: '#64748B', fontSize: '0.75rem' }}>{c.billingAddress}</td>
                         <td>
-                          <strong style={{ color: c.currentBalance >= 0 ? '#15803D' : '#DC2626' }}>
-                            ₹{Math.abs(c.currentBalance).toLocaleString()}{' '}
-                            {c.currentBalance >= 0 ? 'Cr (Advance)' : 'Dr (Due)'}
-                          </strong>
+                          {(() => {
+                            const bal = crusherStore.getCustomerBalance(c.id);
+                            return (
+                              <strong style={{ color: bal <= 0 ? '#15803D' : '#DC2626' }}>
+                                ₹{Math.abs(bal).toLocaleString()}{' '}
+                                {bal < 0 ? 'Cr (Advance)' : bal > 0 ? 'Dr (Due)' : '(Settled)'}
+                              </strong>
+                            );
+                          })()}
                         </td>
                         <td>
-                          <button
-                            onClick={() => {
-                              setCustomerId(c.id);
-                              setActiveTab('NEW_ORDER');
-                            }}
-                            className="owner-btn-secondary"
-                            style={{ fontSize: '0.72rem', padding: '4px 10px' }}
-                          >
-                            Create Order →
-                          </button>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              onClick={() => setSelectedCustomerForAccountBook(c)}
+                              style={{
+                                background: '#ECFDF5',
+                                color: '#059669',
+                                border: '1px solid #A7F3D0',
+                                padding: '4px 8px',
+                                borderRadius: '5px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                              title="Open Customer Total Account Book & Ledger"
+                            >
+                              <BookOpen size={12} /> Account Book
+                            </button>
+                            <button
+                              onClick={() => {
+                                setCustomerId(c.id);
+                                setActiveTab('NEW_ORDER');
+                              }}
+                              className="owner-btn-secondary"
+                              style={{ fontSize: '0.72rem', padding: '4px 10px' }}
+                            >
+                              Create Order →
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1270,6 +1345,15 @@ export const OfficeOperatorDashboard: React.FC<OfficeOperatorDashboardProps> = (
             </div>
           </div>
         </div>
+      )}
+
+      {/* Customer Account Book Modal */}
+      {selectedCustomerForAccountBook && (
+        <CustomerAccountBookModal
+          customer={selectedCustomerForAccountBook}
+          onClose={() => setSelectedCustomerForAccountBook(null)}
+          onOpenGatePass={onViewGatePass}
+        />
       )}
     </div>
   );
